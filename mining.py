@@ -2,11 +2,11 @@ import os
 import re
 from copy import copy
 
-from Scripts.script_base import ScriptBase
-from py_stealth import *
 import constants
 import tools
-from player import Player
+from Scripts.script_base import ScriptBase
+from py_stealth import *
+
 log = AddToSystemJournal
 
 MINE_ENTRANCE_COORDS = (2427, 177)
@@ -65,9 +65,8 @@ if not MINE_IRON:
 
 
 class Miner(ScriptBase):
-    def __init__(self, player: Player):
-        super().__init__(player=player)
-        self.player = player
+    def __init__(self):
+        super().__init__()
         self._mining_spots = []
         self._directions = []
         self._mining_spot = None
@@ -338,5 +337,5 @@ if __name__ == '__main__':
     debug = True
     if debug:
         tools.debug()
-    Miner(Player()).start()
+    Miner().start()
     print("")

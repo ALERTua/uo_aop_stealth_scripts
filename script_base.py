@@ -1,17 +1,14 @@
-import os
-import re
-from copy import copy
-
-from py_stealth import *
-from player import Player
 import constants
 import tools
+from player import Player
+from py_stealth import *
+
 log = AddToSystemJournal
 
 
 class ScriptBase:
-    def __init__(self, player: Player):
-        self.player = player
+    def __init__(self):
+        self.player = Player()
 
     def wait_stamina(self, threshold=20):
         if self.player.stamina < threshold:
@@ -61,12 +58,21 @@ class ScriptBase:
                     log(f"Drop successful")
                     break
 
+    def quit(self):
+        log("Quitting")
+        self.disconnect()
+        exit()
+
+    def disconnect(self):
+        SetARStatus(False)
+        Disconnect()
+        CorrectDisconnection()
+
     def check_health(self):
-        if Dead():
-            self.player.move(*constants.MINOC_HEALER_COORDS)
-            CorrectDisconnection()
-            Disconnect()
-            exit()
+        if self.player.dead:
+            tools.telegram_message(f'{self.player.name} is dead.')
+            self.player.move(*constants.COORDS_MINOC_HEALER)
+            self.quit()
         if (self.player.max_hp - self.player.hp) > 60:
             if self.player.got_bandages:
                 self.player.bandage_self()
@@ -83,8 +89,8 @@ class ScriptBase:
             bandages = FindType(constants.TYPE_ID_BANDAGE, container_id)
             if not bandages:
                 log("WARNING! NO SPARE BANDAGES FOUND!")
-                CorrectDisconnection()
-                os.system('pause')
+                tools.telegram_message(f"{self.player.name}: No bandages found")
+                self.quit()
                 return
 
             log("Grabbing Bandages")
@@ -96,6 +102,7 @@ class ScriptBase:
         food = FindType(food_type, container_id)
         if not food:
             log("WARNING! NO FOOD FOUND!")
+            tools.telegram_message(f"{self.player.name}: No food found", disable_notification=True)
             return
 
         self.player.use_object(food)

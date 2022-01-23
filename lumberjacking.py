@@ -2,11 +2,11 @@ import os
 import re
 from copy import copy
 
-from Scripts.script_base import ScriptBase
-from py_stealth import *
-from player import Player
 import constants
 import tools
+from Scripts.script_base import ScriptBase
+from py_stealth import *
+
 log = AddToSystemJournal
 
 debug = False
@@ -14,7 +14,6 @@ LJ_SLOGS = True
 
 LJ_CONTAINER_ID = 0x728F3B3B
 LJ_CONTAINER_COORDS = (2469, 183)
-# WOOD_ENTRANCE = (2471, 188)
 WOOD_ENTRANCE = (2490, 169)
 WOOD_ZONE_Y = 188
 
@@ -72,9 +71,8 @@ if not LJ_SLOGS:
 
 
 class Lumberjack(ScriptBase):
-    def __init__(self, player: Player):
-        super().__init__(player=player)
-        self.player = player  # type: Player
+    def __init__(self):
+        super().__init__()
         self._trees = []
         self._current_tree = None
 
@@ -134,7 +132,8 @@ class Lumberjack(ScriptBase):
             hatchets = FindType(constants.TYPE_ID_HATCHET, LJ_CONTAINER_ID)
             if not hatchets:
                 log("WARNING! NO SPARE HATCHETS FOUND!")
-                CorrectDisconnection()
+                tools.telegram_message(f"{self.player.name}: No hatchets found")
+                self.quit()
                 os.system('pause')
                 return
 
@@ -279,5 +278,5 @@ class Lumberjack(ScriptBase):
 if __name__ == '__main__':
     if debug:
         tools.debug()
-    Lumberjack(Player()).start()
+    Lumberjack().start()
     print("")

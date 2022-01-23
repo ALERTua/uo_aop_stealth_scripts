@@ -1,9 +1,11 @@
-import pendulum
-from py_stealth import *
 from functools import cached_property, wraps
-import tools
+
+import pendulum
+
 import constants
+from py_stealth import *
 from weapons import WeaponBase
+
 log = AddToSystemJournal
 
 
@@ -91,6 +93,14 @@ class Player:
         while not self.hidden:
             # noinspection PyArgumentList
             self.hide()
+
+    @property
+    def name(self):
+        return CharName()
+
+    @property
+    def dead(self):
+        return Dead()
 
     @property
     def last_target(self):

@@ -3,7 +3,8 @@ import os
 import re
 
 from py_stealth import *
-import time
+
+log = AddToSystemJournal
 
 
 def debug():
@@ -46,3 +47,31 @@ def in_journal(text, regexp=False, return_re_value=False):
                 return True
 
     return False
+
+
+def telegram_message(msg, chat_id=None, disable_notification=False, token=None):
+    if not msg:
+        return
+
+    token = token or os.getenv('STEALTH_TELEGRAM_TOKEN')
+    if token and not token.startswith('bot'):
+        token = f"bot{token}"
+    if not token:
+        return
+
+    chat_id = chat_id or os.getenv('STEALTH_TELEGRAM_CHAT_ID')
+    if not chat_id:
+        return
+
+    disable_notification = str(disable_notification).lower()
+    cmd = f'curl -X POST "https://api.telegram.org/{token}/sendMessage" -d chat_id={chat_id} ' \
+          f'-d disable_notification={disable_notification} -d text="{msg}"'
+    return os.system(cmd)
+
+
+def __main():
+    telegram_message('test message')
+
+
+if __name__ == '__main__':
+    __main()
