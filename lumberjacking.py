@@ -117,6 +117,7 @@ class Lumberjack(ScriptBase):
         self.wait_stamina()
         self.player.move(*LJ_CONTAINER_COORDS)
         UseObject(LJ_CONTAINER_ID)
+        UseObject(LJ_CONTAINER_ID)
         log("Moving to unload done")
 
     def check_hatchet(self):

@@ -79,6 +79,7 @@ class Miner(ScriptBase):
         self.wait_stamina()
         self.player.move(*MINING_CONTAINER_COORDS)
         UseObject(MINING_CONTAINER_ID)
+        UseObject(MINING_CONTAINER_ID)
         log("Moving to unload done")
 
     def eat(self):
