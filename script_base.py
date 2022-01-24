@@ -1,6 +1,10 @@
+from functools import wraps
+
+import pendulum
+
 import constants
 import tools
-from player import Player
+from player import Player, alive_action
 from py_stealth import *
 
 log = AddToSystemJournal
@@ -9,17 +13,21 @@ log = AddToSystemJournal
 class ScriptBase:
     def __init__(self):
         self.player = Player()
+        self._start_time = None
+        self._detected_mobs = []
 
+    @alive_action
     def wait_stamina(self, threshold=20):
         if self.player.stamina < threshold:
             log(f"Waiting stamina at least {threshold}")
         else:
             return
 
-        while self.player.stamina < threshold:
+        while self.player.alive and self.player.stamina < threshold:
             Wait(1000)
         log(f"Stamina reached {threshold}")
 
+    @alive_action
     def _pick_up_items(self, type_ids):
         for type_id in type_ids:
             loot = self.player.find_type_ground(type_id, 3)
@@ -29,6 +37,7 @@ class ScriptBase:
                 loot_result = self.player.loot_ground(loot)
                 loot = self.player.find_type_ground(type_id, 3)
 
+    @alive_action
     def _drop_overweight_items(self, drop_types):
         for drop_type, drop_color, drop_weight in drop_types:
             weight_drop_needed = self.player.weight - self.player.max_weight
@@ -68,20 +77,30 @@ class ScriptBase:
         Disconnect()
         CorrectDisconnection()
 
+    @property
+    def script_running_time(self):
+        script_running_time = pendulum.now() - self._start_time
+        return script_running_time
+
+    @property
+    def script_running_time_words(self):
+        return self.script_running_time.in_words()
+
     def check_health(self):
         if self.player.dead:
-            tools.telegram_message(f'{self.player.name} is dead.')
+            tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}')
             self.player.move(*constants.COORDS_MINOC_HEALER)
             self.quit()
         if (self.player.max_hp - self.player.hp) > 60:
             if self.player.got_bandages:
-                self.player.bandage_self()
+                self.player.bandage_self_if_hurt()
                 return True
             else:
                 return False
         else:
             return True
 
+    @alive_action
     def _check_bandages(self, quantity, container_id):
         log("Checking Bandages")
         player_bandages = self.player.got_bandages
@@ -89,20 +108,23 @@ class ScriptBase:
             bandages = FindType(constants.TYPE_ID_BANDAGE, container_id)
             if not bandages:
                 log("WARNING! NO SPARE BANDAGES FOUND!")
-                tools.telegram_message(f"{self.player.name}: No bandages found")
+                tools.telegram_message(f"{self.player}: No bandages found. "
+                                       f"Script ran for {self.script_running_time_words}")
                 self.quit()
                 return
 
             log("Grabbing Bandages")
             self.player.move_item(bandages, 3)
+            Wait(500)
 
+    @alive_action
     def _eat(self, container_id, food_type=None):
         food_type = food_type or constants.TYPE_ID_FOOD_FISHSTEAKS
         log("Eating")
         food = FindType(food_type, container_id)
         if not food:
             log("WARNING! NO FOOD FOUND!")
-            tools.telegram_message(f"{self.player.name}: No food found", disable_notification=True)
+            tools.telegram_message(f"{self.player}: No food found", disable_notification=True)
             return
 
         self.player.use_object(food)

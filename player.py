@@ -3,10 +3,27 @@ from functools import cached_property, wraps
 import pendulum
 
 import constants
+from creature import Creature
 from py_stealth import *
 from weapons import WeaponBase
 
 log = AddToSystemJournal
+
+
+def alive_action(func):
+    @wraps(func)
+    def wrapper_alive_action(self, *args, **kwargs):
+        if isinstance(self, Player):
+            player = self
+        else:
+            player = self.player
+
+        if player.dead:
+            return
+
+        return func(self, *args, **kwargs)
+
+    return wrapper_alive_action
 
 
 def _cooldown(class_instance, cooldown_field, cooldown, func, *args, **kwargs):
@@ -63,15 +80,12 @@ def mining_cd(func):
 
 
 # noinspection PyMethodMayBeStatic
-class Player:
+class Player(Creature):
     def __init__(self):
+        super().__init__(_id=Self())
         self._skill_cd = pendulum.now()
         self._drag_cd = pendulum.now()
         self._use_cd = pendulum.now()
-
-    @cached_property
-    def id(self):
-        return Self()
 
     @property
     def hp(self):
@@ -99,10 +113,6 @@ class Player:
         return CharName()
 
     @property
-    def dead(self):
-        return Dead()
-
-    @property
     def last_target(self):
         return LastTarget()
 
@@ -113,30 +123,32 @@ class Player:
     def backpack(self):
         return Backpack()
 
+    @alive_action
     def equip_weapon_type(self, weapon: WeaponBase):
         return Equipt(weapon.layer, weapon.type_id)
 
     @property
-    def coords(self):
-        return GetX(self.id), GetY(self.id), GetZ(self.id), WorldNum()
-
-    @property
     def mounted(self):
-        return ObjAtLayerEx(HorseLayer(), self.id)
+        return ObjAtLayerEx(HorseLayer(), self._id)
 
     @drag_cd
     def _use_self(self):
-        UseObject(self.id)
+        UseObject(self._id)
 
+    @alive_action
     def dismount(self):
         while self.mounted:
             # noinspection PyArgumentList
             self._use_self()
 
-    def move(self, x, y, optimized=True, accuracy=0, running=True):
+    def move(self, x, y, optimized=True, accuracy=1, running=True):
+        if x <= 0 or y <= 0:
+            return
+
         # Xdst, Ydst, Optimized, Accuracy, Running
         return newMoveXY(x, y, optimized, accuracy, running)
 
+    @alive_action
     @drag_cd
     def move_item(self, item_id, quantity=-1, target_id=None, x=0, y=0, z=0):
         # ItemID, Count, MoveIntoID, X, Y, Z
@@ -144,11 +156,13 @@ class Player:
         log(f"Moving {quantity} of {item_id} to {target_id} {x} {y} {z}")
         return MoveItem(item_id, quantity, target_id, x, y, z)
 
+    @alive_action
     @drag_cd
     def loot_ground(self, item_id, quantity=-1):
         log(f"Looting {quantity} of {item_id} from ground.")
         return Grab(item_id, quantity)
 
+    @alive_action
     @drag_cd
     def drop_item(self, item_id, quantity=-1):
         if quantity == 0:
@@ -166,9 +180,11 @@ class Player:
         log(f"Using {object_id}")
         return UseObject(object_id)
 
+    @alive_action
     def backpack_find_type(self, type_id, color_id=-1, recursive=True):
         return FindTypeEx(type_id, color_id, self.backpack, recursive)
 
+    @alive_action
     def _got_item_type(self, item_type):
         return self.backpack_find_type(item_type)
 
@@ -192,6 +208,7 @@ class Player:
     def overweight(self):
         return self.weight >= self.max_weight
 
+    @alive_action
     def unload_types(self, item_types, container_id):
         for unload_type in item_types:
             got_type = FindType(unload_type)
@@ -205,6 +222,7 @@ class Player:
     def _nearest_ore(self, ore_type):
         return self.backpack_find_type(ore_type) or self.find_type_ground(ore_type, 3)
 
+    @alive_action
     def smelt_ore(self, forge_id):
         for ore_type in [constants.TYPE_ID_ORE, ]:
             ore = self._nearest_ore(ore_type)
@@ -222,6 +240,7 @@ class Player:
     def say(self, text):
         return UOSay(text)
 
+    @alive_action
     @mining_cd
     def mine(self, direction):
         command = f"'pc mine {direction}"
@@ -252,9 +271,15 @@ class Player:
         SetFindDistance(previous_distance)
         return output
 
+    @alive_action
     @bandage_cd
     def bandage_self(self):
-        self.say("'pc heal self")
+        if self.hp < self.max_hp:
+            self.say("'pc heal self")
+
+    def bandage_self_if_hurt(self):
+        if self.hp < self.max_hp - 50:
+            return self.bandage_self()
 
     @property
     def got_bandages(self):

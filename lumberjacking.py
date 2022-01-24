@@ -2,19 +2,23 @@ import os
 import re
 from copy import copy
 
+import pendulum
+
 import constants
 import tools
-from Scripts.script_base import ScriptBase
+from Scripts.script_base import ScriptBase, alive_action
+from mob import Mob
 from py_stealth import *
 
 log = AddToSystemJournal
 
-debug = False
+debug = True
 LJ_SLOGS = True
+ENGAGE_RANGE_MOBS = True
 
 LJ_CONTAINER_ID = 0x728F3B3B
 LJ_CONTAINER_COORDS = (2469, 183)
-WOOD_ENTRANCE = (2490, 169)
+WOOD_ENTRANCE = (2503, 167)
 WOOD_ZONE_Y = 188
 
 LJ_SPOTS = [
@@ -55,7 +59,6 @@ LJ_SPOTS = [
     (0x0CE6, 2532, 252, 0),
     (0x0CE0, 2532, 255, 0),
     (0x0CCD, 2534, 260, 0),
-    (0x0CD3, 2537, 257, 0),
     (0x0CCD, 2536, 249, 0),
     (0x0CD6, 2536, 243, 0),
     (0x0CD6, 2536, 225, 0),
@@ -82,6 +85,7 @@ class Lumberjack(ScriptBase):
             if not self._trees:
                 self._trees = copy(LJ_SPOTS)
             self._current_tree = self._trees.pop(0)
+            log(f"New Tree: {self._current_tree}. Trees left: {len(self._trees)}/{len(LJ_SPOTS)}")
         return self._current_tree
 
     @current_tree.setter
@@ -120,6 +124,7 @@ class Lumberjack(ScriptBase):
         UseObject(LJ_CONTAINER_ID)
         log("Moving to unload done")
 
+    @alive_action
     def check_hatchet(self):
         # log("Checking Hatchets")
         if self.hatchet:
@@ -133,7 +138,7 @@ class Lumberjack(ScriptBase):
             hatchets = FindType(constants.TYPE_ID_HATCHET, LJ_CONTAINER_ID)
             if not hatchets:
                 log("WARNING! NO SPARE HATCHETS FOUND!")
-                tools.telegram_message(f"{self.player.name}: No hatchets found")
+                tools.telegram_message(f"{self.player}: No hatchets found")
                 self.quit()
                 os.system('pause')
                 return
@@ -166,10 +171,8 @@ class Lumberjack(ScriptBase):
         self.eat()
 
     def tree_depleeted(self):
-        depleeted_tree = copy(self.current_tree)
+        log(f"{self.current_tree} Depleeted.")
         self.current_tree = None
-        new_tree = self.current_tree
-        log(f"{depleeted_tree} Depleeted. New tree: {new_tree}")
 
     def _jack_tree(self, tile_type, x, y, z):
         CancelWaitTarget()
@@ -235,6 +238,25 @@ class Lumberjack(ScriptBase):
         self.go_woods()
         self.move_to_tree()
 
+    def engage_mob(self, mob: Mob):
+        log(f"Engaging mob {mob}")
+        while mob.alive:
+            self.player.move(mob.x, mob.y)
+            self.lj_check_health()
+        log(f"Done Engaging mob {mob}")
+        tools.telegram_message(f"Mob {mob} dead")
+
+    def find_mobs(self):
+        mobs = constants.TYPE_IDS_RANGED_MOBS
+        for mob_type_id in mobs:
+            mob_id = self.player.find_type_ground(mob_type_id, 10)
+            if mob_id and mob_id not in self._detected_mobs:
+                mob = Mob(mob_id)
+                self._detected_mobs.append(mob_id)
+                tools.telegram_message(f"Mob {mob} detected", disable_notification=not mob.mutated)
+                if ENGAGE_RANGE_MOBS:
+                    self.engage_mob(mob)
+
     def lumberjack_process(self):
         self.jack_tree()
         i = 0
@@ -252,12 +274,14 @@ class Lumberjack(ScriptBase):
                 self.tree_depleeted()
                 i = 0
                 self.check_overweight()
+                self.find_mobs()
                 self.lj_check_health()
                 self.lj_check_hatchets()
                 self.general_weight_check()
                 self.jack_tree()
                 continue
 
+            self.find_mobs()
             self.lj_check_health()
             self.lj_check_hatchets()
             self.general_weight_check()
@@ -269,6 +293,7 @@ class Lumberjack(ScriptBase):
             Wait(constants.USE_COOLDOWN)
 
     def start(self):
+        self._start_time = pendulum.now()
         self.general_weight_check()
         if not self.in_woods:
             self.go_woods()

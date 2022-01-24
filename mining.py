@@ -2,12 +2,17 @@ import os
 import re
 from copy import copy
 
+import pendulum
+
 import constants
 import tools
 from Scripts.script_base import ScriptBase
 from py_stealth import *
 
 log = AddToSystemJournal
+
+debug = False
+MINE_IRON = True
 
 MINE_ENTRANCE_COORDS = (2427, 177)
 MINING_CONTAINER_ID = 0x728BAB4E
@@ -54,7 +59,6 @@ DIRECTIONS = [
     'W',
     'NW',
 ]
-MINE_IRON = True
 MINING_ERRORS = [
     'Здесь нет больше руды..',
     'Вы не можете копать в этом месте.',
@@ -327,6 +331,7 @@ class Miner(ScriptBase):
                 self.unload()
 
     def start(self):
+        self._start_time = pendulum.now()
         self.general_weight_check()
         if not self.in_mine:
             self.go_to_mine_entrance()
@@ -335,7 +340,6 @@ class Miner(ScriptBase):
 
 
 if __name__ == '__main__':
-    debug = True
     if debug:
         tools.debug()
     Miner().start()
