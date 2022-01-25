@@ -1,11 +1,11 @@
-from functools import cached_property, wraps
+from functools import wraps
 
 import pendulum
 
-import constants
-from creature import Creature
+from tools import constants, tools
+from entities.base_creature import Creature
 from py_stealth import *
-from weapons import WeaponBase
+from entities.base_weapon import WeaponBase
 
 log = AddToSystemJournal
 
@@ -41,32 +41,32 @@ def _cooldown(class_instance, cooldown_field, cooldown, func, *args, **kwargs):
 
 def skill_cd(func):
     @wraps(func)
-    def wrapper_skill_cd(player, *args, **kwargs):
-        return _cooldown(player, '_skill_cd', constants.SKILL_COOLDOWN, func, *args, **kwargs)
+    def wrapper_skill_cd(self, *args, **kwargs):
+        return _cooldown(self, '_skill_cd', constants.SKILL_COOLDOWN, func, *args, **kwargs)
 
     return wrapper_skill_cd
 
 
 def drag_cd(func):
     @wraps(func)
-    def wrapper_drag_cd(player, *args, **kwargs):
-        return _cooldown(player, '_drag_cd', constants.DRAG_COOLDOWN, func, *args, **kwargs)
+    def wrapper_drag_cd(self, *args, **kwargs):
+        return _cooldown(self, '_drag_cd', constants.DRAG_COOLDOWN, func, *args, **kwargs)
 
     return wrapper_drag_cd
 
 
 def use_cd(func):
     @wraps(func)
-    def wrapper_use_cd(player, *args, **kwargs):
-        return _cooldown(player, '_use_cd', constants.USE_COOLDOWN, func, *args, **kwargs)
+    def wrapper_use_cd(self, *args, **kwargs):
+        return _cooldown(self, '_use_cd', constants.USE_COOLDOWN, func, *args, **kwargs)
 
     return wrapper_use_cd
 
 
 def bandage_cd(func):
     @wraps(func)
-    def wrapper_use_cd(player, *args, **kwargs):
-        return _cooldown(player, '_use_cd', constants.BANDAGE_COOLDOWN, func, *args, **kwargs)
+    def wrapper_use_cd(self, *args, **kwargs):
+        return _cooldown(self, '_use_cd', constants.BANDAGE_COOLDOWN, func, *args, **kwargs)
 
     return wrapper_use_cd
 
@@ -127,10 +127,6 @@ class Player(Creature):
     def equip_weapon_type(self, weapon: WeaponBase):
         return Equipt(weapon.layer, weapon.type_id)
 
-    @property
-    def mounted(self):
-        return ObjAtLayerEx(HorseLayer(), self._id)
-
     @drag_cd
     def _use_self(self):
         UseObject(self._id)
@@ -140,6 +136,10 @@ class Player(Creature):
         while self.mounted:
             # noinspection PyArgumentList
             self._use_self()
+
+    @alive_action
+    def open_backpack(self):
+        return self.use_object(self.backpack)
 
     def move(self, x, y, optimized=True, accuracy=1, running=True):
         if x <= 0 or y <= 0:
@@ -180,14 +180,6 @@ class Player(Creature):
         log(f"Using {object_id}")
         return UseObject(object_id)
 
-    @alive_action
-    def backpack_find_type(self, type_id, color_id=-1, recursive=True):
-        return FindTypeEx(type_id, color_id, self.backpack, recursive)
-
-    @alive_action
-    def _got_item_type(self, item_type):
-        return self.backpack_find_type(item_type)
-
     @property
     def max_weight(self):
         return Str() * 3 + 30 - 1
@@ -219,20 +211,6 @@ class Player(Creature):
                     got_type = FindType(unload_type)
                 log(f"Moving {got_type} Done")
 
-    def _nearest_ore(self, ore_type):
-        return self.backpack_find_type(ore_type) or self.find_type_ground(ore_type, 3)
-
-    @alive_action
-    def smelt_ore(self, forge_id):
-        for ore_type in [constants.TYPE_ID_ORE, ]:
-            ore = self._nearest_ore(ore_type)
-            while ore:
-                log(f"Smelting {ore}")
-                self.use_object(ore)
-                WaitTargetObject(forge_id)
-                Wait(500)
-                ore = self._nearest_ore(ore_type)
-
     @property
     def stamina(self):
         return Stam()
@@ -247,6 +225,7 @@ class Player(Creature):
         log(f"Mining {direction}")
         self.say(command)
 
+    @alive_action
     def break_action(self):
         SetWarMode(True)
         Wait(50)
@@ -266,10 +245,48 @@ class Player(Creature):
         colors = colors or [0]
         previous_distance = GetFindDistance()
         SetFindDistance(distance)
-        FindTypesArrayEx(type_ids, colors, [0], False)
-        output = GetFoundList()
+        # noinspection PyArgumentList
+        output = self.find_types_container(type_ids=type_ids, colors=colors, container_ids=[0])
         SetFindDistance(previous_distance)
         return output
+
+    @alive_action
+    def find_types_container(self, type_ids, colors=None, container_ids=None, recursive=False):
+        colors = colors or [0]  # no -1 here
+        container_ids = container_ids or [self.backpack]
+        if not isinstance(container_ids, (list, tuple)):
+            container_ids = [container_ids]
+        FindTypesArrayEx(type_ids, colors, container_ids, recursive)
+        output = GetFoundList()
+        return output
+
+    def find_types_backpack(self, type_ids, colors=None, recursive=False):
+        # noinspection PyArgumentList
+        return self.find_types_container(type_ids=type_ids, colors=colors, container_ids=[self.backpack],
+                                         recursive=recursive)
+
+    @alive_action
+    def find_type_backpack(self, type_id, color_id=None, recursive=True):
+        color_id = color_id or -1
+        return FindTypeEx(type_id, color_id, self.backpack, recursive)
+
+    def got_item_type(self, item_type, color_id=None):
+        return self.find_type_backpack(item_type, color_id=color_id)
+
+    def nearest_object_type(self, object_type, distance=None):
+        distance = distance or constants.USE_GROUND_RANGE
+        return self.find_type_backpack(object_type) or self.find_type_ground(object_type, distance)
+
+    @alive_action
+    def smelt_ore(self, forge_id):
+        for ore_type in [constants.TYPE_ID_ORE, ]:
+            ore = self.nearest_object_type(ore_type)
+            while ore:
+                log(f"Smelting {ore}")
+                self.use_object(ore)
+                WaitTargetObject(forge_id)
+                tools.ping_delay()
+                ore = self.nearest_object_type(ore_type)
 
     @alive_action
     @bandage_cd
@@ -277,13 +294,15 @@ class Player(Creature):
         if self.hp < self.max_hp:
             self.say("'pc heal self")
 
+    @alive_action
     def bandage_self_if_hurt(self):
         if self.hp < self.max_hp - 50:
+            # noinspection PyArgumentList
             return self.bandage_self()
 
     @property
     def got_bandages(self):
-        return self._got_item_type(constants.TYPE_ID_BANDAGE)
+        return self.got_item_type(constants.TYPE_ID_BANDAGE)
 
 
 if __name__ == '__main__':

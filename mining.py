@@ -1,12 +1,10 @@
-import os
 import re
 from copy import copy
 
 import pendulum
 
-import constants
-import tools
-from Scripts.script_base import ScriptBase
+from tools import constants, tools
+from entities.base_script import ScriptBase
 from py_stealth import *
 
 log = AddToSystemJournal
@@ -91,7 +89,7 @@ class Miner(ScriptBase):
 
     @property
     def pickaxe(self):
-        return self.player.backpack_find_type(constants.TYPE_ID_TOOL_PICKAXE)
+        return self.player.find_type_backpack(constants.TYPE_ID_TOOL_PICKAXE)
 
     def check_pickaxes(self):
         if self.pickaxe:
@@ -105,8 +103,7 @@ class Miner(ScriptBase):
             pickaxes = FindType(constants.TYPE_ID_TOOL_PICKAXE, MINING_CONTAINER_ID)
             if not pickaxes:
                 log("WARNING! NO SPARE PICKAXES FOUND!")
-                CorrectDisconnection()
-                os.system('pause')
+                self.quit()
                 return
 
             log("Grabbing a Pickaxe")
@@ -298,7 +295,7 @@ class Miner(ScriptBase):
     @property
     def got_ore(self):
         # noinspection PyProtectedMember
-        return self.player._got_item_type(constants.TYPE_ID_ORE)
+        return self.player.got_item_type(constants.TYPE_ID_ORE)
 
     def drop_overweight_items(self):
         drop_types = [

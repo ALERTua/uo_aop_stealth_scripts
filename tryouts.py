@@ -1,12 +1,6 @@
-import sys
-import os
-import constants
-from mining import Miner
-from lumberjacking import Lumberjack
-from lastobject_lasttarget import LastObjectLastTarget
 from py_stealth import *
-from player import Player
-import tools
+from entities.player import Player
+from tools import tools
 
 log = AddToSystemJournal
 

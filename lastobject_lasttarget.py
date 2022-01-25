@@ -1,5 +1,5 @@
-import tools
-from Scripts.script_base import ScriptBase
+from tools import tools
+from entities.base_script import ScriptBase
 from py_stealth import *
 
 log = AddToSystemJournal

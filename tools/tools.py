@@ -22,8 +22,8 @@ def debug():
         pydevd_pycharm.settrace(ip, port=port, stdoutToServer=True, stderrToServer=True, suspend=False)
     except Exception as e:
         print("Error connecting to PyCharm Debugger @ %s:%s : %s %s" % (ip, port, type(e), e))
-        os.system('pause')
-    print("Connected to PyCharm Debugger @ %s:%s" % (ip, port))
+    else:
+        print("Connected to PyCharm Debugger @ %s:%s" % (ip, port))
 
 
 def get_prev_function_name():
@@ -67,6 +67,10 @@ def telegram_message(msg, chat_id=None, disable_notification=False, token=None):
     cmd = f'curl -X POST "https://api.telegram.org/{token}/sendMessage" -d chat_id={chat_id} ' \
           f'-d disable_notification={disable_notification} -d text="{msg}"'
     return os.system(cmd)
+
+
+def ping_delay(delay=250):
+    return Wait(delay)
 
 
 def __main():

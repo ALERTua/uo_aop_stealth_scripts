@@ -1,13 +1,12 @@
-import os
 import re
 from copy import copy
 
 import pendulum
 
-import constants
-import tools
-from Scripts.script_base import ScriptBase, alive_action
-from mob import Mob
+from tools import constants, tools
+from entities.base_script import ScriptBase, alive_action
+from entities.item import Item
+from entities.mob import Mob
 from py_stealth import *
 
 log = AddToSystemJournal
@@ -15,9 +14,9 @@ log = AddToSystemJournal
 debug = True
 LJ_SLOGS = True
 ENGAGE_RANGE_MOBS = True
-
+HOLD_BANDAGES = 2
 LJ_CONTAINER_ID = 0x728F3B3B
-LJ_CONTAINER_COORDS = (2469, 183)
+LJ_CONTAINER_COORDS = (2470, 182)
 WOOD_ENTRANCE = (2503, 167)
 WOOD_ZONE_Y = 188
 
@@ -84,6 +83,7 @@ class Lumberjack(ScriptBase):
         if not self._current_tree:
             if not self._trees:
                 self._trees = copy(LJ_SPOTS)
+                self.report_stats()
             self._current_tree = self._trees.pop(0)
             log(f"New Tree: {self._current_tree}. Trees left: {len(self._trees)}/{len(LJ_SPOTS)}")
         return self._current_tree
@@ -94,7 +94,7 @@ class Lumberjack(ScriptBase):
 
     @property
     def hatchet(self):
-        return self.player.backpack_find_type(constants.TYPE_ID_HATCHET)
+        return self.player.find_type_backpack(constants.TYPE_ID_HATCHET)
 
     @property
     def got_hatchet(self):
@@ -105,6 +105,7 @@ class Lumberjack(ScriptBase):
         return self._pick_up_items(type_ids)
 
     def move_to_tree(self):
+        self.parse_commands()
         self.check_overweight()
         self.wait_stamina(5)
         running = self.player.near_max_weight is False and self.player.stamina > 10
@@ -115,45 +116,62 @@ class Lumberjack(ScriptBase):
         self.general_weight_check()
 
     def move_to_unload(self):
-        log("Moving to unload")
-        if self.in_woods:
-            self.go_woods()
-        self.wait_stamina()
-        self.player.move(*LJ_CONTAINER_COORDS)
-        UseObject(LJ_CONTAINER_ID)
-        UseObject(LJ_CONTAINER_ID)
-        log("Moving to unload done")
+        self.parse_commands()
+        dist_to_container = Dist(self.player.x, self.player.y, *LJ_CONTAINER_COORDS)
+        if dist_to_container > 1:
+            log("Moving to unload")
+            if self.in_woods:
+                self.go_woods()
+            self.wait_stamina()
+            self.player.move(*LJ_CONTAINER_COORDS, accuracy=0)
+            tools.ping_delay()
+            log("Moving to unload done")
+        self.player.use_object(LJ_CONTAINER_ID)
 
     @alive_action
     def check_hatchet(self):
-        # log("Checking Hatchets")
         if self.hatchet:
             return True
-        else:
-            if self.in_woods:
-                return False
 
-            log("Moving to grab a Hatchet")
-            self.move_to_unload()
-            hatchets = FindType(constants.TYPE_ID_HATCHET, LJ_CONTAINER_ID)
-            if not hatchets:
-                log("WARNING! NO SPARE HATCHETS FOUND!")
-                tools.telegram_message(f"{self.player}: No hatchets found")
-                self.quit()
-                os.system('pause')
-                return
+        if self.in_woods:
+            return False
 
-            while not self.player.move_item(hatchets):
-                log("Grabbing a Hatchet")
-                pass
+        log("Moving to grab a Hatchet")
+        self.move_to_unload()
+        container_hatchet = self.player.find_type(constants.TYPE_ID_HATCHET, LJ_CONTAINER_ID)
+        if not container_hatchet:
+            todo = GetFindedList()
+            log("WARNING! NO SPARE HATCHETS FOUND!")
+            tools.telegram_message(f"{self.player}: No hatchets found: {todo}")
+            self.quit()
+            return
 
-            return True
+        while not self.got_hatchet and not self.player.move_item(container_hatchet):
+            log("Grabbing a Hatchet")
+            tools.ping_delay()
+
+        return True
 
     def check_bandages(self):
-        return self._check_bandages(2, LJ_CONTAINER_ID)
+        return self._check_bandages(HOLD_BANDAGES, LJ_CONTAINER_ID)
 
     def eat(self):
         return self._eat(LJ_CONTAINER_ID)
+
+    def count_logs(self, recursive=True):
+        logs_type_ids = (constants.TYPE_ID_LOGS,)
+        logs_colors = constants.COLOR_LOGS
+        logs = self.player.find_types_backpack(type_ids=logs_type_ids, colors=logs_colors, recursive=recursive)
+        for logs_id in logs:
+            log_obj = Item(logs_id)
+            log_type = log_obj.type_
+            log_color = log_obj.color
+            log_quantity = log_obj.quantity
+            if self.script_stats.get(log_type, None) is None:
+                self.script_stats[log_type] = {}
+            if self.script_stats[log_type].get(log_color, None) is None:
+                self.script_stats[log_type][log_color] = 0
+            self.script_stats[log_type][log_color] += log_quantity
 
     def unload(self):
         log("Unloading")
@@ -164,8 +182,9 @@ class Lumberjack(ScriptBase):
             *constants.TYPE_IDS_LOOT,
             *constants.TYPE_IDS_LJ_LOOT
         ]
+        self.count_logs()
+        self.parse_commands()
         self.player.unload_types(unload_types, LJ_CONTAINER_ID)
-        self.check_hatchet()
         self.check_hatchet()
         self.check_bandages()
         self.eat()
@@ -175,6 +194,7 @@ class Lumberjack(ScriptBase):
         self.current_tree = None
 
     def _jack_tree(self, tile_type, x, y, z):
+        self.parse_commands()
         CancelWaitTarget()
         self.player.use_object(self.hatchet)
         WaitTargetTile(tile_type, x, y, z)
@@ -182,7 +202,7 @@ class Lumberjack(ScriptBase):
     @property
     def got_logs(self):
         # noinspection PyProtectedMember
-        return self.player._got_item_type(constants.TYPE_ID_LOGS)
+        return self.player.got_item_type(constants.TYPE_ID_LOGS)
 
     def general_weight_check(self):
         if self.got_logs and self.player.near_max_weight:
@@ -220,6 +240,7 @@ class Lumberjack(ScriptBase):
         self.wait_stamina()
         log(f"Going to the woods")
         self.player.move(*WOOD_ENTRANCE)
+        self.player.open_backpack()
         log(f"Going to the woods done")
         self.wait_stamina(5)
 
@@ -238,24 +259,25 @@ class Lumberjack(ScriptBase):
         self.go_woods()
         self.move_to_tree()
 
-    def engage_mob(self, mob: Mob):
-        log(f"Engaging mob {mob}")
-        while mob.alive:
-            self.player.move(mob.x, mob.y)
-            self.lj_check_health()
-        log(f"Done Engaging mob {mob}")
-        tools.telegram_message(f"Mob {mob} dead")
+    def engage_mob(self, mob: Mob, check_health_func=None):
+        return super().engage_mob(mob=mob, check_health_func=self.lj_check_health)
 
     def find_mobs(self):
         mobs = constants.TYPE_IDS_RANGED_MOBS
         for mob_type_id in mobs:
-            mob_id = self.player.find_type_ground(mob_type_id, 10)
+            mob_id = self.player.find_type_ground(mob_type_id, constants.AGGRO_RANGE)
             if mob_id and mob_id not in self._detected_mobs:
                 mob = Mob(mob_id)
                 self._detected_mobs.append(mob_id)
-                tools.telegram_message(f"Mob {mob} detected", disable_notification=not mob.mutated)
+                tools.telegram_message(f"Mob {mob} detected at distance {mob.distance}",
+                                       disable_notification=not mob.mutated)
                 if ENGAGE_RANGE_MOBS:
-                    self.engage_mob(mob)
+                    mob_distance = mob.path_distance()
+                    max_distance = constants.ENGAGE_RANGE
+                    if mob_distance > max_distance:
+                        log(f"Won't engage {mob}. Distance path: {mob_distance} > {max_distance}")
+                    else:
+                        self.engage_mob(mob)
 
     def lumberjack_process(self):
         self.jack_tree()
@@ -281,12 +303,13 @@ class Lumberjack(ScriptBase):
                 self.jack_tree()
                 continue
 
+            self.parse_commands()
             self.find_mobs()
             self.lj_check_health()
             self.lj_check_hatchets()
             self.general_weight_check()
             i += 1
-            if i > 3:
+            if i > 2:
                 self.jack_tree()
                 i = 0
 
@@ -295,6 +318,9 @@ class Lumberjack(ScriptBase):
     def start(self):
         self._start_time = pendulum.now()
         self.general_weight_check()
+        dist_to_container = Dist(self.player.x, self.player.y, *LJ_CONTAINER_COORDS)
+        if dist_to_container < 20:
+            self.unload()
         if not self.in_woods:
             self.go_woods()
 
@@ -304,5 +330,6 @@ class Lumberjack(ScriptBase):
 if __name__ == '__main__':
     if debug:
         tools.debug()
+
     Lumberjack().start()
     print("")

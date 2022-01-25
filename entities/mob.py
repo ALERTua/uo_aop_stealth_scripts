@@ -1,7 +1,5 @@
-from functools import cached_property, wraps
-
-import constants
-from creature import Creature
+from tools import constants
+from entities.base_creature import Creature
 from py_stealth import *
 
 log = AddToSystemJournal
@@ -14,3 +12,7 @@ class Mob(Creature):
     @property
     def mutated(self):
         return 'mutated' in self.name.lower()
+
+    @property
+    def in_aggro_range(self):
+        return self.distance <= constants.AGGRO_RANGE

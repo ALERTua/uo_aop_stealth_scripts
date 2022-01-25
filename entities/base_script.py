@@ -1,10 +1,11 @@
-from functools import wraps
-
+import signal
+import atexit
 import pendulum
+import pprint
 
-import constants
-import tools
-from player import Player, alive_action
+from tools import constants, tools
+from entities.mob import Mob
+from entities.player import Player, alive_action
 from py_stealth import *
 
 log = AddToSystemJournal
@@ -15,6 +16,67 @@ class ScriptBase:
         self.player = Player()
         self._start_time = None
         self._detected_mobs = []
+        self.script_stats = {}
+        self._register_signals()
+        self.commands_cooldown_sec = 30
+        self._commands_cooldown = {}
+        atexit.register(self.at_exit)
+
+    def _register_signals(self):
+        signals = (signal.SIGABRT, signal.SIGBREAK, signal.SIGFPE, signal.SIGILL, signal.SIGINT, signal.SIGSEGV,
+                   signal.SIGTERM)
+        for signal_ in signals:
+            signal.signal(signal_, self.at_exit)
+
+    def at_exit(self):
+        log(f"{self} atexit. Script stats:\n{self.script_stats_str}")
+
+    def __str__(self):
+        return self.name
+
+    def stop(self):
+        log(f"Stopping {self}")
+        self.at_exit()
+        StopAllScripts()
+
+    def _parse_command(self, command):
+        return tools.in_journal(f'{self.player.name}: {command}') and not self._commmand_on_cooldown(command)
+
+    def _commmand_on_cooldown(self, command):
+        record = self._commands_cooldown.get(command)
+        if not record:
+            return False
+
+        return pendulum.now() <= record
+
+    def _command_add_cooldown(self, command, cooldown_secs=None):
+        if cooldown_secs is None:
+            cooldown_secs = self.commands_cooldown_sec
+
+        self._commands_cooldown[command] = pendulum.now().add(seconds=cooldown_secs)
+
+    def report_stats(self):
+        if self.script_stats:
+            return log(f"{self} stats:\n{self.script_stats_str}")
+
+    def parse_commands(self):
+        if self._parse_command('quit'):
+            self._command_add_cooldown('quit')
+            return self.quit()
+        elif self._parse_command('stop'):
+            self._command_add_cooldown('stop')
+            return self.stop()
+        elif self._parse_command('stats'):
+            self._command_add_cooldown('stats')
+            return self.report_stats()
+
+    @property
+    def script_stats_str(self):
+        return pprint.pformat(self.script_stats, indent=2, width=10)
+
+    @property
+    def name(self):
+        return self.__class__.__name__
 
     @alive_action
     def wait_stamina(self, threshold=20):
@@ -38,6 +100,16 @@ class ScriptBase:
                 loot = self.player.find_type_ground(type_id, 3)
 
     @alive_action
+    def engage_mob(self, mob: Mob, check_health_func=None):
+        check_health_func = check_health_func or self.check_health
+        log(f"Engaging {mob}")
+        while mob.alive:
+            self.player.move(mob.x, mob.y)
+            check_health_func()  # script_check_health in scripts
+        log(f"Done Engaging {mob}")
+        tools.telegram_message(f"{mob} dead")
+
+    @alive_action
     def _drop_overweight_items(self, drop_types):
         for drop_type, drop_color, drop_weight in drop_types:
             weight_drop_needed = self.player.weight - self.player.max_weight
@@ -49,7 +121,7 @@ class ScriptBase:
                 if weight_drop_needed < 1:
                     break
 
-                drop_object_id = self.player.backpack_find_type(drop_type, drop_color)
+                drop_object_id = self.player.find_type_backpack(drop_type, drop_color)
                 if not drop_object_id:
                     break
 
@@ -62,17 +134,19 @@ class ScriptBase:
                 log(f"Need to relieve of {weight_drop_needed}st. Dropping {drop_quantity}x{drop_weight}st "
                     f"of {drop_object_name}{drop_object_id}")
                 drop_result = self.player.drop_item(drop_object_id, drop_quantity)
-                new_item_id = self.player.backpack_find_type(drop_type, drop_color)
+                new_item_id = self.player.find_type_backpack(drop_type, drop_color)
                 if drop_result or (new_item_id != drop_object_id or drop_object_quantity != GetQuantity(new_item_id)):
                     log(f"Drop successful")
                     break
 
     def quit(self):
         log("Quitting")
+        self.at_exit()
         self.disconnect()
         exit()
 
-    def disconnect(self):
+    @staticmethod
+    def disconnect():
         SetARStatus(False)
         Disconnect()
         CorrectDisconnection()
@@ -101,6 +175,10 @@ class ScriptBase:
             return True
 
     @alive_action
+    def got_bandages(self, quantity):
+        return GetQuantity(self.player.find_type_backpack(constants.TYPE_ID_BANDAGE)) == quantity
+
+    @alive_action
     def _check_bandages(self, quantity, container_id):
         log("Checking Bandages")
         player_bandages = self.player.got_bandages
@@ -113,9 +191,9 @@ class ScriptBase:
                 self.quit()
                 return
 
-            log("Grabbing Bandages")
-            self.player.move_item(bandages, 3)
-            Wait(500)
+            while not self.got_bandages(quantity) and not self.player.move_item(bandages, quantity):
+                log("Grabbing Bandages")
+                tools.ping_delay()
 
     @alive_action
     def _eat(self, container_id, food_type=None):
