@@ -1,4 +1,4 @@
-from base_object import Object
+from .base_object import Object
 from py_stealth import *
 
 log = AddToSystemJournal

@@ -4,8 +4,8 @@ import pendulum
 import pprint
 
 from tools import constants, tools
-from entities.mob import Mob
-from entities.player import Player, alive_action
+from .mob import Mob
+from .player import Player, alive_action
 from py_stealth import *
 
 log = AddToSystemJournal

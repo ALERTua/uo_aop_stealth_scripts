@@ -1,6 +1,6 @@
-from entities.base_weapon import LeftHandWeapon, RightHandWeapon
-from py_stealth import *
+from base_weapon import LeftHandWeapon, RightHandWeapon
 from tools import constants
+from py_stealth import *
 
 log = AddToSystemJournal
 

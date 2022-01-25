@@ -3,9 +3,9 @@ from functools import wraps
 import pendulum
 
 from tools import constants, tools
-from entities.base_creature import Creature
+from .base_creature import Creature
+from .base_weapon import WeaponBase
 from py_stealth import *
-from entities.base_weapon import WeaponBase
 
 log = AddToSystemJournal
 

@@ -1,5 +1,5 @@
+from .base_creature import Creature
 from tools import constants
-from entities.base_creature import Creature
 from py_stealth import *
 
 log = AddToSystemJournal

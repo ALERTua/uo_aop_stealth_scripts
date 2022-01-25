@@ -1,6 +1,6 @@
-from py_stealth import *
 from entities.player import Player
 from tools import tools
+from py_stealth import *
 
 log = AddToSystemJournal
 
