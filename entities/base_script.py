@@ -15,7 +15,7 @@ class ScriptBase:
     def __init__(self):
         self.player = Player()
         self._start_time = None
-        self._detected_mobs = []
+        self._processed_mobs = []
         self.script_stats = {}
         self._register_signals()
         self.commands_cooldown_sec = 30
@@ -100,17 +100,32 @@ class ScriptBase:
                 loot = self.player.find_type_ground(type_id, 3)
 
     @alive_action
-    def engage_mob(self, mob: Mob, check_health_func=None):
+    def engage_mob(self, mob: Mob, check_health_func=None, loot=True, cut=True, drop_trash_items=True,
+                   notify_only_mutated=True):
         check_health_func = check_health_func or self.check_health
         log(f"Engaging {mob}")
         while mob.alive:
             self.player.move(mob.x, mob.y)
+            self.player.attack(mob.id_)
             check_health_func()  # script_check_health in scripts
         log(f"Done Engaging {mob}")
-        tools.telegram_message(f"{mob} dead")
+        if not notify_only_mutated or (notify_only_mutated and mob.mutated):
+            tools.telegram_message(f"{mob} dead", disable_notification=not mob.mutated)
+        if loot:
+            self.player.loot_nearest_corpse(cut_corpse=cut, drop_trash_items=drop_trash_items)
+
+    def check_overweight(self, drop_types=None):
+        if not self.player.near_max_weight:
+            return
+
+        self.player.break_action()
+        self.drop_overweight_items(drop_types)
 
     @alive_action
-    def _drop_overweight_items(self, drop_types):
+    def drop_overweight_items(self, drop_types):
+        if not drop_types:
+            return
+
         for drop_type, drop_color, drop_weight in drop_types:
             weight_drop_needed = self.player.weight - self.player.max_weight
             if weight_drop_needed < 1:
@@ -165,7 +180,8 @@ class ScriptBase:
             tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}')
             self.player.move(*constants.COORDS_MINOC_HEALER)
             self.quit()
-        if (self.player.max_hp - self.player.hp) > 60:
+        need_heal = (self.player.max_hp - self.player.hp) > (self.player.max_hp * 0.4)
+        if need_heal:
             if self.player.got_bandages:
                 self.player.bandage_self_if_hurt()
                 return True
@@ -206,3 +222,34 @@ class ScriptBase:
             return
 
         self.player.use_object(food)
+
+    @alive_action
+    def process_mobs(self, mob_type_ids, engage=True, notify_only_mutated=True):
+        for mob_type_id in mob_type_ids:
+            mob_id = self.player.find_type_ground(mob_type_id, constants.AGGRO_RANGE)
+            if mob_id and mob_id not in self._processed_mobs:
+                mob = Mob(mob_id)
+                self._processed_mobs.append(mob_id)
+                if not notify_only_mutated or (notify_only_mutated and mob.mutated):
+                    tools.telegram_message(f"Mob {mob} detected at distance {mob.distance}",
+                                           disable_notification=not mob.mutated)
+                if engage:
+                    mob_distance = mob.path_distance()
+                    max_distance = constants.ENGAGE_MAX_DISTANCE
+                    if mob_distance > max_distance:
+                        log(f"Won't engage {mob}. Distance path: {mob_distance} > {max_distance}")
+                    else:
+                        self.engage_mob(mob)
+
+    @staticmethod
+    def mob_type_ids(ranged=False, melee=False, critter=False, aggressive=False):
+        mob_type_ids = []
+        if ranged:
+            mob_type_ids.extend(constants.TYPE_IDS_MOB_RANGED)
+        if aggressive:
+            mob_type_ids.extend(constants.TYPE_IDS_MOB_AGGRESSIVE)
+        if melee:
+            mob_type_ids.extend(constants.TYPE_IDS_MOB_MELEE)
+        if critter:
+            mob_type_ids.extend(constants.TYPE_IDS_CRITTER)
+        return mob_type_ids

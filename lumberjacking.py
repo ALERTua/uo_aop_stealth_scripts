@@ -13,12 +13,17 @@ log = AddToSystemJournal
 
 debug = True
 LJ_SLOGS = True
-ENGAGE_RANGE_MOBS = True
+ENGAGE_RANGED_MOBS = True
+ENGAGE_MELEE_MOBS = True
+ENGAGE_CRITTERS = True
+LOOT_CORPSES = True
+CUT_CORPSES = True
 HOLD_BANDAGES = 2
 LJ_CONTAINER_ID = 0x728F3B3B
 LJ_CONTAINER_COORDS = (2470, 182)
 WOOD_ENTRANCE = (2503, 167)
 WOOD_ZONE_Y = 188
+
 
 LJ_SPOTS = [
     (0x0CD0, 2512, 207, 0),
@@ -221,19 +226,12 @@ class Lumberjack(ScriptBase):
         self.move_to_tree()
         self._jack_tree(*self.current_tree)
 
-    def drop_overweight_items(self):
+    def check_overweight(self, drop_types=None):
         drop_types = [
             (constants.TYPE_ID_LOGS, constants.COLOR_LOGS_S, constants.WEIGHT_LOGS),
             (constants.TYPE_ID_LOGS, -1, constants.WEIGHT_LOGS),
         ]
-        return self._drop_overweight_items(drop_types)
-
-    def check_overweight(self):
-        if not self.player.near_max_weight:
-            return
-
-        self.player.break_action()
-        self.drop_overweight_items()
+        return super().check_overweight(drop_types)
 
     def go_woods(self):
         self.check_overweight()
@@ -259,25 +257,13 @@ class Lumberjack(ScriptBase):
         self.go_woods()
         self.move_to_tree()
 
-    def engage_mob(self, mob: Mob, check_health_func=None):
-        return super().engage_mob(mob=mob, check_health_func=self.lj_check_health)
+    def engage_mob(self, mob: Mob, **kwargs):
+        return super().engage_mob(mob=mob, check_health_func=self.lj_check_health, loot=LOOT_CORPSES, cut=CUT_CORPSES,
+                                  drop_trash_items=True)
 
-    def find_mobs(self):
-        mobs = constants.TYPE_IDS_RANGED_MOBS
-        for mob_type_id in mobs:
-            mob_id = self.player.find_type_ground(mob_type_id, constants.AGGRO_RANGE)
-            if mob_id and mob_id not in self._detected_mobs:
-                mob = Mob(mob_id)
-                self._detected_mobs.append(mob_id)
-                tools.telegram_message(f"Mob {mob} detected at distance {mob.distance}",
-                                       disable_notification=not mob.mutated)
-                if ENGAGE_RANGE_MOBS:
-                    mob_distance = mob.path_distance()
-                    max_distance = constants.ENGAGE_RANGE
-                    if mob_distance > max_distance:
-                        log(f"Won't engage {mob}. Distance path: {mob_distance} > {max_distance}")
-                    else:
-                        self.engage_mob(mob)
+    def process_mobs(self, **kwargs):
+        mob_type_ids = self.mob_type_ids(ranged=ENGAGE_RANGED_MOBS, melee=ENGAGE_MELEE_MOBS, critter=ENGAGE_CRITTERS)
+        return super().process_mobs(mob_type_ids=mob_type_ids, engage=True)
 
     def lumberjack_process(self):
         self.jack_tree()
@@ -296,7 +282,7 @@ class Lumberjack(ScriptBase):
                 self.tree_depleeted()
                 i = 0
                 self.check_overweight()
-                self.find_mobs()
+                self.process_mobs()
                 self.lj_check_health()
                 self.lj_check_hatchets()
                 self.general_weight_check()
@@ -304,7 +290,7 @@ class Lumberjack(ScriptBase):
                 continue
 
             self.parse_commands()
-            self.find_mobs()
+            self.process_mobs()
             self.lj_check_health()
             self.lj_check_hatchets()
             self.general_weight_check()
@@ -317,6 +303,7 @@ class Lumberjack(ScriptBase):
 
     def start(self):
         self._start_time = pendulum.now()
+        self.check_health()
         self.general_weight_check()
         dist_to_container = Dist(self.player.x, self.player.y, *LJ_CONTAINER_COORDS)
         if dist_to_container < 20:

@@ -1,3 +1,4 @@
+from tools import constants
 from py_stealth import *
 
 log = AddToSystemJournal
@@ -7,6 +8,12 @@ class Object:
     def __init__(self, _id):
         self._id = _id
         self._name = None
+
+    def __eq__(self, other):
+        try:
+            return self.id_ == other.id_
+        except:
+            return False
 
     def __str__(self):
         return f"[{self.__class__.__name__}]({self._id}){self.name}"
@@ -33,10 +40,8 @@ class Object:
 
     @property
     def name(self):
-        if self._name is None:
-            name = self._get_name()
-            if name:
-                self._name = name
+        if not self._name:
+            self._name = self._get_name() or ''
         return self._name
 
     @property
@@ -56,14 +61,73 @@ class Object:
         return self.x, self.y, self.z, WorldNum()
 
     @property
+    def _player_id(self):
+        return Self()
+
+    @property
+    def player_x(self):
+        return GetX(self._player_id)
+
+    @property
+    def player_y(self):
+        return GetY(self._player_id)
+
+    @property
     def distance(self):
-        player_id = Self()
-        player_x = GetX(player_id)
-        player_y = GetY(player_id)
-        return Dist(player_x, player_y, self.x, self.y)
+        return Dist(self.player_x, self.player_y, self.x, self.y)
 
     def path(self, optimized=True, accuracy=0):
         return GetPathArray(self.x, self.y, optimized, accuracy)
 
     def path_distance(self, optimized=True, accuracy=0):
         return len(self.path(optimized=optimized, accuracy=accuracy))
+
+    @property
+    def notoriety(self):
+        """
+        1 - innocent(blue)
+        2 - guilded/ally(green)
+        3 - attackable but not criminal(gray)
+        4 - criminal(gray)
+        5 - enemy(orange)
+        6 - murderer(red)
+        0,7 - not in use.
+
+        Unknown = 0x00,
+        Innocent = 0x01,
+        Ally = 0x02,
+        Gray = 0x03,
+        Criminal = 0x04,
+        Enemy = 0x05,
+        Murderer = 0x06,
+        Invulnerable = 0x07
+        """
+        return GetNotoriety(self._id)
+
+    @property
+    def innocent(self):
+        return self.notoriety == constants.Notoriety.Innocent
+
+    @property
+    def ally(self):
+        return self.notoriety == constants.Notoriety.Ally
+
+    @property
+    def gray(self):
+        return self.notoriety == constants.Notoriety.Gray
+
+    @property
+    def criminal(self):
+        return self.notoriety == constants.Notoriety.Criminal
+
+    @property
+    def enemy(self):
+        return self.notoriety == constants.Notoriety.Enemy
+
+    @property
+    def murderer(self):
+        return self.notoriety == constants.Notoriety.Murderer
+
+    @property
+    def invulnerable(self):
+        return self.notoriety == constants.Notoriety.Invulnerable

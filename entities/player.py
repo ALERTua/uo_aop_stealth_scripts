@@ -1,7 +1,10 @@
+from collections import namedtuple
 from functools import wraps
 
 import pendulum
 
+from entities.base_object import Object
+from entities.item import Item
 from tools import constants, tools
 from .base_creature import Creature
 from .base_weapon import WeaponBase
@@ -141,6 +144,10 @@ class Player(Creature):
     def open_backpack(self):
         return self.use_object(self.backpack)
 
+    @alive_action
+    def attack(self, target_id):
+        return Attack(target_id)
+
     def move(self, x, y, optimized=True, accuracy=1, running=True):
         if x <= 0 or y <= 0:
             return
@@ -174,7 +181,7 @@ class Player(Creature):
 
     @use_cd
     def use_object(self, object_id):
-        if object_id == 0:
+        if object_id in (0, None, -1):
             return
 
         log(f"Using {object_id}")
@@ -296,13 +303,132 @@ class Player(Creature):
 
     @alive_action
     def bandage_self_if_hurt(self):
-        if self.hp < self.max_hp - 50:
+        if self.hp < self.max_hp - 60:
             # noinspection PyArgumentList
             return self.bandage_self()
 
     @property
     def got_bandages(self):
         return self.got_item_type(constants.TYPE_ID_BANDAGE)
+
+    def loot_container(self, container_id, destination_id=None, delay=constants.LOOT_COOLDOWN,
+                       use_container_before_looting=True):
+        if not IsContainer(container_id):
+            log(f"Cannot loot container {container_id}. It is not a container.")
+            return False
+
+        destination_id = destination_id or self.backpack
+        delay = delay or constants.LOOT_COOLDOWN
+        if use_container_before_looting:
+            self.use_object(container_id)
+            tools.ping_delay()
+
+        return EmptyContainer(container_id, destination_id, delay)
+
+    def drop_trash_items(self, trash_item_ids=None, recursive=False):
+        trash_item_ids = trash_item_ids or constants.ITEM_IDS_TRASH
+        for item_id in trash_item_ids:
+            item = self.find_type_backpack(item_id, recursive=recursive)
+            if item:
+                self.drop_item(item)
+
+    def loot_nearest_corpse(self, range_=constants.USE_GROUND_RANGE, cut_corpse=True, drop_trash_items=True):
+        # todo: notoriety check
+        range_ = range_ or constants.USE_GROUND_RANGE
+        corpse_id = self.find_type_ground(constants.TYPE_ID_CORPSE, range_)
+        if not corpse_id:
+            return False
+
+        if cut_corpse:
+            corpse_obj = Object(corpse_id)
+            self.move(corpse_obj.x, corpse_obj.y)
+            self.cut_corpse(corpse_id)
+        self.loot_container(corpse_id)
+        if drop_trash_items:
+            self.drop_trash_items()
+
+    def cut_corpse(self, corpse_id):  # todo: notoriety check
+        containers = [RhandLayer(), LhandLayer(), self.backpack]
+        cut_tool_type_ids = constants.TYPE_IDS_CORPSE_CUT_TOOLS
+        cut_tool = None
+        break_ = False
+        for type_id in cut_tool_type_ids:
+            if break_:
+                break
+
+            for container_id in containers:
+                cut_tool = self.find_type(type_id, container_id)
+                if cut_tool:
+                    break_ = True
+                    break
+
+            for layer in [RhandLayer(), LhandLayer()]:
+                layer_obj = ObjAtLayer(layer)
+                if not layer_obj:
+                    continue
+
+                layer_obj = Object(layer_obj)
+                if layer_obj.type_ == type_id:
+                    cut_tool = layer_obj.id_
+
+        if not cut_tool:
+            log(f'Cannot cut corpse {corpse_id}. No cutting tool.')
+            return
+
+        CancelWaitTarget()
+        WaitTargetObject(corpse_id)
+        self.use_object(cut_tool)
+
+    def path_to_coords(self, x, y, optimized=True, accuracy=0):
+        return GetPathArray(x, y, optimized, accuracy)
+
+    def path_distance_to(self, x, y):
+        return len(self.path_to_coords(x, y))
+
+    def get_closest_coords(self, coords):
+        Coords = namedtuple('Coords', ['x', 'y', 'distance'])
+        spots = []
+        for spot in coords:
+            coords = Coords(*spot, self.path_distance_to(*spot))
+            spots.append(coords)
+        spots = sorted(spots, key=lambda i: i.distance)
+        closest_spot = spots[0]
+        return closest_spot.x, closest_spot.y
+
+    @property
+    def weapon_equipped(self):
+        if self.dead:
+            return
+
+        layers = (LhandLayer(), RhandLayer())
+        weapon_type_ids = constants.TYPE_IDS_WEAPONS
+        equipped_weapons = []
+        for layer in layers:
+            layer_object_id = ObjAtLayer(layer)
+            equipped_weapons.append(layer_object_id)
+        equipped_types = [GetType(i) for i in equipped_weapons]
+        output = any(e for e in equipped_types if e in weapon_type_ids)
+        return output
+
+    def equip_object(self, item_or_id, layer):
+        if isinstance(item_or_id, Item):
+            item_or_id = item_or_id.id_
+        return Equip(layer, item_or_id)
+
+    def equip_weapon_id(self, weapon_or_id):
+        return self.equip_object(weapon_or_id, RhandLayer())
+
+    def equip_armor_id(self, armor_or_id):
+        return self.equip_object(armor_or_id, ShirtLayer())
+
+    def use_type(self, type_id):
+        if not type_id:
+            return
+
+        return UseType2(type_id)
+
+    def distance_to(self, x, y):
+        return Dist(self.x, self.y, x, y)
 
 
 if __name__ == '__main__':

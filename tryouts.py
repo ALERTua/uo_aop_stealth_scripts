@@ -1,3 +1,5 @@
+from entities.base_object import Object
+from entities.item import Item
 from entities.player import Player
 from tools import tools
 from py_stealth import *
