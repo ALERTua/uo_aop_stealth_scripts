@@ -1,5 +1,7 @@
 from collections import namedtuple
+from collections.abc import Iterable
 from functools import wraps
+from typing import List
 
 import pendulum
 
@@ -181,6 +183,8 @@ class Player(Creature):
 
     @use_cd
     def use_object(self, object_id):
+        if isinstance(object_id, Object):
+            object_id = object_id.id_
         if object_id in (0, None, -1):
             return
 
@@ -213,9 +217,8 @@ class Player(Creature):
             got_type = FindType(unload_type)
             if got_type:
                 log(f"Moving {got_type}")
-                while got_type:
+                while got_type := FindType(unload_type):
                     self.move_item(got_type, GetQuantity(got_type), container_id, 0, 0, 0)
-                    got_type = FindType(unload_type)
                 log(f"Moving {got_type} Done")
 
     @property
@@ -249,6 +252,8 @@ class Player(Creature):
         return output
 
     def find_types_ground(self, type_ids, colors=None, distance=2):
+        if not isinstance(type_ids, Iterable):
+            type_ids = [type_ids]
         colors = colors or [0]
         previous_distance = GetFindDistance()
         SetFindDistance(distance)
@@ -287,13 +292,12 @@ class Player(Creature):
     @alive_action
     def smelt_ore(self, forge_id):
         for ore_type in [constants.TYPE_ID_ORE, ]:
-            ore = self.nearest_object_type(ore_type)
-            while ore:
+            while ore := self.nearest_object_type(ore_type):
                 log(f"Smelting {ore}")
+                CancelWaitTarget()
                 self.use_object(ore)
                 WaitTargetObject(forge_id)
                 tools.ping_delay()
-                ore = self.nearest_object_type(ore_type)
 
     @alive_action
     @bandage_cd
@@ -313,6 +317,8 @@ class Player(Creature):
 
     def loot_container(self, container_id, destination_id=None, delay=constants.LOOT_COOLDOWN,
                        use_container_before_looting=True):
+        if isinstance(container_id, Object):
+            container_id = container_id.id_
         if not IsContainer(container_id):
             log(f"Cannot loot container {container_id}. It is not a container.")
             return False
@@ -328,14 +334,15 @@ class Player(Creature):
     def drop_trash_items(self, trash_item_ids=None, recursive=False):
         trash_item_ids = trash_item_ids or constants.ITEM_IDS_TRASH
         for item_id in trash_item_ids:
-            item = self.find_type_backpack(item_id, recursive=recursive)
-            if item:
-                self.drop_item(item)
+            while item := self.find_type_backpack(item_id, recursive=recursive):
+                if item:
+                    self.drop_item(item)
 
-    def loot_nearest_corpse(self, range_=constants.USE_GROUND_RANGE, cut_corpse=True, drop_trash_items=True):
+    def loot_nearest_corpse(self, corpse_id=None, range_=constants.USE_GROUND_RANGE, cut_corpse=True,
+                            drop_trash_items=True):
         # todo: notoriety check
         range_ = range_ or constants.USE_GROUND_RANGE
-        corpse_id = self.find_type_ground(constants.TYPE_ID_CORPSE, range_)
+        corpse_id = corpse_id or self.find_type_ground(constants.TYPE_ID_CORPSE, range_)
         if not corpse_id:
             return False
 
@@ -361,15 +368,6 @@ class Player(Creature):
                 if cut_tool:
                     break_ = True
                     break
-
-            for layer in [RhandLayer(), LhandLayer()]:
-                layer_obj = ObjAtLayer(layer)
-                if not layer_obj:
-                    continue
-
-                layer_obj = Object(layer_obj)
-                if layer_obj.type_ == type_id:
-                    cut_tool = layer_obj.id_
 
         if not cut_tool:
             log(f'Cannot cut corpse {corpse_id}. No cutting tool.')
@@ -429,6 +427,40 @@ class Player(Creature):
 
     def distance_to(self, x, y):
         return Dist(self.x, self.y, x, y)
+
+    def find_red_creatures(self, distance=20, path_distance: bool = True, condition=None):
+        return self.find_creatures(distance=distance, path_distance=path_distance,
+                                   notorieties=[constants.Notoriety.Murderer], condition=condition)
+
+    def find_humans(self, distance=20, path_distance: bool = True, condition=None, notorieties=None):
+        return self.find_creatures(distance=distance, path_distance=path_distance, condition=condition,
+                                   creature_types=[constants.TYPE_ID_HUMAN], notorieties=notorieties)
+
+    def find_red_humans(self, distance=20, path_distance: bool = True, condition=None):
+        return self.find_humans(distance=distance, path_distance=path_distance,
+                                notorieties=[constants.Notoriety.Murderer], condition=condition)
+
+    def find_creatures(self, distance: int = 20, path_distance: bool = True, creature_types: List[int] = None,
+                       notorieties: List[int] or List[constants.Notoriety] = None,
+                       condition: callable = None) -> List[Creature]:
+        if notorieties and not isinstance(notorieties, Iterable):
+            notorieties = [notorieties]
+        if creature_types and not isinstance(creature_types, Iterable):
+            creature_types = [creature_types]
+        previous_distance = GetFindDistance()
+        SetFindDistance(distance)
+        FindType(-1, 0)
+        found = GetFindedList()
+        output = [Creature(i) for i in found if i]
+        SetFindDistance(previous_distance)
+        if creature_types:
+            output = [i for i in output if i.type_ in creature_types]
+        if notorieties:
+            output = [i for i in output if i.notoriety in notorieties]
+        if path_distance:
+            output = [i for i in output if i.path_distance() <= distance]
+
+        return list(filter(condition, output)) if condition else output
 
 
 if __name__ == '__main__':

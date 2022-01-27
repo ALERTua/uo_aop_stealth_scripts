@@ -86,24 +86,22 @@ class ScriptBase:
             return
 
         while self.player.alive and self.player.stamina < threshold:
-            Wait(1000)
+            tools.ping_delay()
         log(f"Stamina reached {threshold}")
 
     @alive_action
     def _pick_up_items(self, type_ids):
         for type_id in type_ids:
-            loot = self.player.find_type_ground(type_id, 3)
-            loot_result = None
-            while loot and not loot_result:
+            while (loot := self.player.find_type_ground(type_id, constants.MAX_PICK_UP_DISTANCE)) \
+                    and not self.player.loot_ground(loot):
                 log(f"Looting {loot}")
-                loot_result = self.player.loot_ground(loot)
-                loot = self.player.find_type_ground(type_id, 3)
+                tools.ping_delay()
 
     @alive_action
     def engage_mob(self, mob: Mob, check_health_func=None, loot=True, cut=True, drop_trash_items=True,
                    notify_only_mutated=True):
         check_health_func = check_health_func or self.check_health
-        log(f"Engaging {mob}")
+        log(f"Engaging {mob} distance {mob.path_distance()}")
         while mob.alive:
             self.player.move(mob.x, mob.y)
             self.player.attack(mob.id_)
@@ -114,12 +112,16 @@ class ScriptBase:
         if loot:
             self.player.loot_nearest_corpse(cut_corpse=cut, drop_trash_items=drop_trash_items)
 
+    def drop_trash(self):
+        return self.player.drop_trash_items(constants.ITEM_IDS_MINING_TRASH)
+
     def check_overweight(self, drop_types=None):
-        if not self.player.near_max_weight:
+        if not self.player.overweight:  # consider near_max_weight
             return
 
         self.player.break_action()
-        self.drop_overweight_items(drop_types)
+        self.drop_trash()
+        self.drop_overweight_items(drop_types=drop_types)
 
     @alive_action
     def drop_overweight_items(self, drop_types):
@@ -149,6 +151,7 @@ class ScriptBase:
                 log(f"Need to relieve of {weight_drop_needed}st. Dropping {drop_quantity}x{drop_weight}st "
                     f"of {drop_object_name}{drop_object_id}")
                 drop_result = self.player.drop_item(drop_object_id, drop_quantity)
+                tools.result_delay()
                 new_item_id = self.player.find_type_backpack(drop_type, drop_color)
                 if drop_result or (new_item_id != drop_object_id or drop_object_quantity != GetQuantity(new_item_id)):
                     log(f"Drop successful")
@@ -253,3 +256,7 @@ class ScriptBase:
         if critter:
             mob_type_ids.extend(constants.TYPE_IDS_CRITTER)
         return mob_type_ids
+
+    @property
+    def should_run(self):
+        return self.player.near_max_weight is False and self.player.stamina > 10

@@ -5,8 +5,9 @@ log = AddToSystemJournal
 
 
 class Object:
-    def __init__(self, _id):
+    def __init__(self, _id, color=None):
         self._id = _id
+        self._color = color
         self._name = None
 
     def __eq__(self, other):
@@ -28,7 +29,13 @@ class Object:
 
     @property
     def color(self):
-        return GetColor(self._id)
+        if self._color is None:
+            self._color = GetColor(self._id)
+        return self._color
+
+    @color.setter
+    def color(self, value):
+        self._color = value
 
     @property
     def exists(self):
@@ -57,6 +64,10 @@ class Object:
         return GetZ(self._id)
 
     @property
+    def xy(self):
+        return self.x, self.y
+
+    @property
     def coords(self):
         return self.x, self.y, self.z, WorldNum()
 
@@ -74,16 +85,27 @@ class Object:
 
     @property
     def distance(self):
+        if self.coords == (0, 0, 0, 0):  # creature coords unknown
+            return 99999
+
         return Dist(self.player_x, self.player_y, self.x, self.y)
 
     def path(self, optimized=True, accuracy=0):
-        return GetPathArray(self.x, self.y, optimized, accuracy)
+        output = GetPathArray(self.x, self.y, optimized, accuracy)
+        return output
 
     def path_distance(self, optimized=True, accuracy=0):
-        return len(self.path(optimized=optimized, accuracy=accuracy))
+        if self.coords == (0, 0, 0, 0):  # creature coords unknown
+            return 99999
+
+        output = self.path(optimized=optimized, accuracy=accuracy)
+        if len(output) == 0 and self.x != self.player_x and self.y != self.player_y:
+            return 99999  # cannot build path to the creature
+
+        return len(output)
 
     @property
-    def notoriety(self):
+    def notoriety(self) -> constants.Notoriety:
         """
         1 - innocent(blue)
         2 - guilded/ally(green)
@@ -102,7 +124,9 @@ class Object:
         Murderer = 0x06,
         Invulnerable = 0x07
         """
-        return GetNotoriety(self._id)
+        notoriety = GetNotoriety(self._id)
+        output = constants.Notoriety(notoriety)
+        return output
 
     @property
     def innocent(self):

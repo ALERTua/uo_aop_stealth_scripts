@@ -69,8 +69,16 @@ def telegram_message(msg, chat_id=None, disable_notification=False, token=None):
     return os.system(cmd)
 
 
-def ping_delay(delay=250):
+def _delay(delay=250):
     return Wait(delay)
+
+
+def ping_delay():
+    return _delay(250)
+
+
+def result_delay():
+    return _delay(500)
 
 
 def __main():

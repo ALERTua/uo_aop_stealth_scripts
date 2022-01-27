@@ -305,7 +305,7 @@ class Lumberjack(ScriptBase):
         self._start_time = pendulum.now()
         self.check_health()
         self.general_weight_check()
-        dist_to_container = Dist(self.player.x, self.player.y, *LJ_CONTAINER_COORDS)
+        dist_to_container = self.player.path_distance_to(*LJ_CONTAINER_COORDS)
         if dist_to_container < 20:
             self.unload()
         if not self.in_woods:
