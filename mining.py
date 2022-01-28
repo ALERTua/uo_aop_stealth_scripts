@@ -86,16 +86,20 @@ class Miner(ScriptBase):
         super().__init__()
         self._mining_spots = []
         self._directions = []
-        self._looted_corpses = []
         self._mining_spot = None
         self._direction = None
-        self._checked_weapons = []
         self.drop_types = [
             (constants.TYPE_ID_ORE, constants.COLOR_ORE_IRON, constants.WEIGHT_ORE),
             (constants.TYPE_ID_INGOT, constants.COLOR_INGOT_IRON, constants.WEIGHT_INGOT),
             (constants.TYPE_ID_ORE, -1, constants.WEIGHT_ORE),
             (constants.TYPE_ID_INGOT, -1, constants.WEIGHT_INGOT)
         ]
+
+    def loot_corpses(self):
+        if not LOOT_CORPSES:
+            return
+
+        return super().loot_corpses()
 
     def move_to_unload(self):
         log("Moving to unload")
@@ -147,6 +151,7 @@ class Miner(ScriptBase):
         self.player.unload_types(unload_types, MINING_CONTAINER_ID)
         self.check_pickaxes()
         self.check_bandages()
+        self.rearm_from_container()
         self.eat()
 
     def go_to_mine_entrance(self):
@@ -210,27 +215,6 @@ class Miner(ScriptBase):
         return super().engage_mob(mob=mob, check_health_func=self.mine_check_health, loot=LOOT_CORPSES, cut=CUT_CORPSES,
                                   drop_trash_items=True, notify_only_mutated=True)
 
-    @alive_action
-    def process_mobs(self, engage=True, notify_only_mutated=True):
-        while creatures := self.player.find_red_creatures(
-                distance=MOB_FIND_DISTANCE, condition=lambda i: i not in self._processed_mobs):
-            for creature in creatures:
-                if creature in self._processed_mobs:
-                    continue
-
-                self._processed_mobs.append(creature)
-                mob = Mob(creature.id_)
-                if not notify_only_mutated or (notify_only_mutated and mob.mutated):
-                    tools.telegram_message(f"{mob} detected at distance {mob.path_distance()}",
-                                           disable_notification=not mob.mutated)
-                if engage:
-                    mob_distance = mob.path_distance()
-                    max_distance = constants.ENGAGE_MAX_DISTANCE
-                    if mob_distance > max_distance:
-                        log(f"Won't engage {mob}. Distance path: {mob_distance} > {max_distance}")
-                    else:
-                        self.engage_mob(mob)
-
     def mine_check_pickaxes(self):
         if self.check_pickaxes():
             pass
@@ -254,18 +238,6 @@ class Miner(ScriptBase):
             self.go_to_mine_entrance()
             self.get_free_pickaxe()
             self.move_mining_spot()
-
-    def loot_corpses(self):
-        if not LOOT_CORPSES:
-            return
-
-        for corpse in self.player.find_types_ground(constants.TYPE_ID_CORPSE):
-            if corpse in self._looted_corpses:
-                continue
-
-            self.player.loot_nearest_corpse(corpse_id=corpse, cut_corpse=False)
-            self._looted_corpses.append(corpse)
-        self.player.drop_trash_items()
 
     def move_mining_spot(self):
         self.check_overweight()
@@ -395,58 +367,17 @@ class Miner(ScriptBase):
                 self.unload()
             return True  # to force mine next direction after smelting
 
-    def check_weapon(self):
+    def check_weapon(self, **kwargs):
         if not EQUIP_WEAPONS_FROM_GROUND:
             return
 
-        if self.player.weapon_equipped:
-            return False
+        return super().check_weapon(max_weapon_search_distance=MAX_WEAPON_SEARCH_DISTANCE)
 
-        while not self.player.weapon_equipped:
-            for weapon_type in constants.TYPE_IDS_WEAPONS:
-                if self.player.weapon_equipped:
-                    break
-
-                found_weapon = self.player.find_type_ground(weapon_type, distance=MAX_WEAPON_SEARCH_DISTANCE)
-                if not found_weapon:
-                    continue
-
-                found_weapon = Item(found_weapon)
-                if found_weapon in self._checked_weapons:
-                    continue
-
-                self._checked_weapons.append(found_weapon)
-                path_distance = self.player.path_distance_to(*found_weapon.xy)
-                if path_distance > MAX_WEAPON_SEARCH_DISTANCE:
-                    continue
-
-                self.wait_stamina()
-                self.check_overweight()
-                self.player.move(*found_weapon.xy, accuracy=constants.MAX_PICK_UP_DISTANCE, running=self.should_run)
-                self.player.equip_weapon_id(found_weapon)
-                tools.result_delay()
-
-        return True
-
-    def rearm_from_container(self, weapon_type_ids=None, container_id=None):
+    def rearm_from_container(self, **kwargs):
         if not EQUIP_WEAPONS_FROM_LOOT_CONTAINER:
             return
 
-        if self.player.weapon_equipped:
-            return
-
-        weapon_type_ids = weapon_type_ids or constants.TYPE_IDS_WEAPONS
-        container_id = container_id or MINING_CONTAINER_ID
-        for weapon_type_id in weapon_type_ids:
-            if self.player.weapon_equipped:
-                break
-
-            found_weapon = self.player.find_type(weapon_type_id, container_id)
-            if not found_weapon:
-                continue
-
-            self.player.equip_object(found_weapon, RhandLayer())
-            tools.result_delay()
+        return super().rearm_from_container(container_id=MINING_CONTAINER_ID)
 
     def start(self):
         self._start_time = pendulum.now()

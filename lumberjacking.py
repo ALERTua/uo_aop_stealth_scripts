@@ -4,6 +4,7 @@ from copy import copy
 import pendulum
 
 from entities.base_script import ScriptBase, alive_action
+from entities.container import Container
 from entities.item import Item
 from entities.mob import Mob
 from py_stealth import *
@@ -19,6 +20,9 @@ ENGAGE_CRITTERS = True
 LOOT_CORPSES = True
 CUT_CORPSES = True
 HOLD_BANDAGES = 2
+EQUIP_WEAPONS_FROM_GROUND = True
+EQUIP_WEAPONS_FROM_LOOT_CONTAINER = True
+MAX_WEAPON_SEARCH_DISTANCE = 20
 LJ_CONTAINER_ID = 0x728F3B3B
 LJ_CONTAINER_COORDS = (2470, 182)
 WOOD_ENTRANCE = (2503, 167)
@@ -113,10 +117,10 @@ class Lumberjack(ScriptBase):
         self.parse_commands()
         self.check_overweight()
         self.wait_stamina(5)
-        running = self.player.near_max_weight is False and self.player.stamina > 10
         tile_type, x, y, z = self.current_tree
-        self.player.move(x, y, accuracy=1, running=running)
+        self.player.move(x, y, accuracy=1, running=self.should_run)
         self.pick_up_items()
+        self.loot_corpses()
         self.check_overweight()
         self.general_weight_check()
 
@@ -167,6 +171,9 @@ class Lumberjack(ScriptBase):
         logs_type_ids = (constants.TYPE_ID_LOGS,)
         logs_colors = constants.COLOR_LOGS
         logs = self.player.find_types_backpack(type_ids=logs_type_ids, colors=logs_colors, recursive=recursive)
+        if not logs:
+            return
+
         for logs_id in logs:
             log_obj = Item(logs_id)
             log_type = log_obj.type_
@@ -192,6 +199,7 @@ class Lumberjack(ScriptBase):
         self.player.unload_types(unload_types, LJ_CONTAINER_ID)
         self.check_hatchet()
         self.check_bandages()
+        self.rearm_from_container()
         self.eat()
 
     def tree_depleeted(self):
@@ -210,7 +218,7 @@ class Lumberjack(ScriptBase):
         return self.player.got_item_type(constants.TYPE_ID_LOGS)
 
     def general_weight_check(self):
-        if self.got_logs and self.player.near_max_weight:
+        if self.got_logs and self.player.overweight:
             self.unload_and_return()
 
     @property
@@ -220,10 +228,10 @@ class Lumberjack(ScriptBase):
         return output
 
     def jack_tree(self):
-        ClearJournal()
-        while self.player.near_max_weight:
+        while self.player.overweight:
             self.general_weight_check()
         self.move_to_tree()
+        ClearJournal()
         self._jack_tree(*self.current_tree)
 
     def check_overweight(self, drop_types=None):
@@ -261,10 +269,6 @@ class Lumberjack(ScriptBase):
         return super().engage_mob(mob=mob, check_health_func=self.lj_check_health, loot=LOOT_CORPSES, cut=CUT_CORPSES,
                                   drop_trash_items=True)
 
-    def process_mobs(self, **kwargs):
-        mob_type_ids = self.mob_type_ids(ranged=ENGAGE_RANGED_MOBS, melee=ENGAGE_MELEE_MOBS, critter=ENGAGE_CRITTERS)
-        return super().process_mobs(mob_type_ids=mob_type_ids, engage=True)
-
     def lumberjack_process(self):
         self.jack_tree()
         i = 0
@@ -284,6 +288,7 @@ class Lumberjack(ScriptBase):
                 self.check_overweight()
                 self.process_mobs()
                 self.lj_check_health()
+                self.check_weapon()
                 self.lj_check_hatchets()
                 self.general_weight_check()
                 self.jack_tree()
@@ -292,6 +297,7 @@ class Lumberjack(ScriptBase):
             self.parse_commands()
             self.process_mobs()
             self.lj_check_health()
+            self.check_weapon()
             self.lj_check_hatchets()
             self.general_weight_check()
             i += 1
@@ -300,6 +306,24 @@ class Lumberjack(ScriptBase):
                 i = 0
 
             Wait(constants.USE_COOLDOWN)
+
+    def loot_corpses(self):
+        if not LOOT_CORPSES:
+            return
+
+        return super().loot_corpses()
+
+    def check_weapon(self, **kwargs):
+        if not EQUIP_WEAPONS_FROM_GROUND:
+            return
+
+        return super().check_weapon(max_weapon_search_distance=MAX_WEAPON_SEARCH_DISTANCE)
+
+    def rearm_from_container(self, **kwargs):
+        if not EQUIP_WEAPONS_FROM_LOOT_CONTAINER:
+            return
+
+        return super().rearm_from_container(container_id=LJ_CONTAINER_ID)
 
     def start(self):
         self._start_time = pendulum.now()

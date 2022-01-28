@@ -1,9 +1,12 @@
 import signal
 import atexit
+from copy import copy
+
 import pendulum
 import pprint
 
 from tools import constants, tools
+from .item import Item
 from .mob import Mob
 from .player import Player, alive_action
 from py_stealth import *
@@ -20,6 +23,8 @@ class ScriptBase:
         self._register_signals()
         self.commands_cooldown_sec = 30
         self._commands_cooldown = {}
+        self._looted_corpses = []
+        self._checked_weapons = []
         atexit.register(self.at_exit)
 
     def _register_signals(self):
@@ -93,7 +98,7 @@ class ScriptBase:
     def _pick_up_items(self, type_ids):
         for type_id in type_ids:
             while (loot := self.player.find_type_ground(type_id, constants.MAX_PICK_UP_DISTANCE)) \
-                    and not self.player.loot_ground(loot):
+                    and not self.player.grab(loot):
                 log(f"Looting {loot}")
                 tools.ping_delay()
 
@@ -101,6 +106,11 @@ class ScriptBase:
     def engage_mob(self, mob: Mob, check_health_func=None, loot=True, cut=True, drop_trash_items=True,
                    notify_only_mutated=True):
         check_health_func = check_health_func or self.check_health
+        distance = mob.path_distance()
+        if distance > 50:
+            log(f"Won't engage mob that {distance} this far away")
+            return
+
         log(f"Engaging {mob} distance {mob.path_distance()}")
         while mob.alive:
             self.player.move(mob.x, mob.y)
@@ -114,6 +124,15 @@ class ScriptBase:
 
     def drop_trash(self):
         return self.player.drop_trash_items(constants.ITEM_IDS_MINING_TRASH)
+
+    def loot_corpses(self):
+        for corpse in self.player.find_types_ground(constants.TYPE_ID_CORPSE):
+            if corpse in self._looted_corpses:
+                continue
+
+            self.player.loot_nearest_corpse(corpse_id=corpse, cut_corpse=False)
+            self._looted_corpses.append(corpse)
+        self.player.drop_trash_items()
 
     def check_overweight(self, drop_types=None):
         if not self.player.overweight:  # consider near_max_weight
@@ -148,6 +167,10 @@ class ScriptBase:
                     break
 
                 drop_quantity = min((weight_drop_needed // drop_weight) + 1, drop_object_quantity)
+                if not drop_quantity:
+                    log(f"won't drop {drop_quantity} of {drop_object_name} {drop_object_id}")
+                    break
+
                 log(f"Need to relieve of {weight_drop_needed}st. Dropping {drop_quantity}x{drop_weight}st "
                     f"of {drop_object_name}{drop_object_id}")
                 drop_result = self.player.drop_item(drop_object_id, drop_quantity)
@@ -227,22 +250,93 @@ class ScriptBase:
         self.player.use_object(food)
 
     @alive_action
-    def process_mobs(self, mob_type_ids, engage=True, notify_only_mutated=True):
-        for mob_type_id in mob_type_ids:
-            mob_id = self.player.find_type_ground(mob_type_id, constants.AGGRO_RANGE)
-            if mob_id and mob_id not in self._processed_mobs:
-                mob = Mob(mob_id)
-                self._processed_mobs.append(mob_id)
+    def process_mobs(self, engage=True, notify_only_mutated=True, mob_find_distance=20):
+        while creatures := self.player.find_red_creatures(
+                distance=mob_find_distance, condition=lambda i: i not in self._processed_mobs):
+            for creature in creatures:
+                if creature in self._processed_mobs:
+                    continue
+
+                # noinspection PyProtectedMember
+                mob = Mob(creature.id_, path_distance=creature._path_distance)
                 if not notify_only_mutated or (notify_only_mutated and mob.mutated):
-                    tools.telegram_message(f"Mob {mob} detected at distance {mob.distance}",
+                    tools.telegram_message(f"{mob} detected at distance {mob.path_distance()}",
                                            disable_notification=not mob.mutated)
                 if engage:
-                    mob_distance = mob.path_distance()
+                    # noinspection PyProtectedMember
+                    mob_distance = mob._path_distance  # we already got this
                     max_distance = constants.ENGAGE_MAX_DISTANCE
                     if mob_distance > max_distance:
                         log(f"Won't engage {mob}. Distance path: {mob_distance} > {max_distance}")
                     else:
                         self.engage_mob(mob)
+                self._processed_mobs.append(creature)
+
+    @alive_action
+    def rearm_from_container(self, weapon_type_ids=None, container_id=None):
+        if self.player.weapon_equipped:
+            return
+
+        log(f"Rearming from container {container_id}")
+        weapon_type_ids = weapon_type_ids or constants.TYPE_IDS_WEAPONS
+        if not weapon_type_ids:
+            return
+
+        if not container_id:
+            return
+
+        for weapon_type_id in weapon_type_ids:
+            if self.player.weapon_equipped:
+                break
+
+            found_weapon = self.player.find_type(weapon_type_id, container_id)
+            if not found_weapon:
+                continue
+
+            self.player.equip_object(found_weapon, RhandLayer())
+            tools.result_delay()
+
+    @alive_action
+    def check_weapon(self, max_weapon_search_distance=20):
+        if self.player.weapon_equipped:
+            return False
+
+        log(f"Checking weapons on ground")
+        weapon_types = copy(constants.TYPE_IDS_WEAPONS)
+        while not self.player.weapon_equipped:
+            if not weapon_types:
+                log(f"No weapons found on ground")
+                return
+
+            for weapon_type in weapon_types:
+                if self.player.weapon_equipped:
+                    return True
+
+                found_weapon = self.player.find_type_ground(weapon_type, distance=max_weapon_search_distance)
+                if not found_weapon:
+                    weapon_types.remove(weapon_type)
+                    continue
+
+                found_weapon = Item(found_weapon)
+                if found_weapon in self._checked_weapons:
+                    weapon_types.remove(weapon_type)
+                    continue
+
+                self._checked_weapons.append(found_weapon)
+                path_distance = self.player.path_distance_to(*found_weapon.xy)
+                if path_distance > max_weapon_search_distance:
+                    weapon_types.remove(weapon_type)
+                    continue
+
+                self.wait_stamina()
+                self.check_overweight()
+                self.player.move(*found_weapon.xy, accuracy=constants.MAX_PICK_UP_DISTANCE, running=self.should_run)
+                self.player.equip_weapon_id(found_weapon)
+                tools.result_delay()
+                weapon_types.remove(weapon_type)
+                return True
+
+        log(f"Done checking weapons on ground")
 
     @staticmethod
     def mob_type_ids(ranged=False, melee=False, critter=False, aggressive=False):

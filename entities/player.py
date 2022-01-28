@@ -119,14 +119,19 @@ class Player(Creature):
 
     @property
     def last_target(self):
-        return LastTarget()
+        return Object(LastTarget())
+
+    @property
+    def last_object(self):
+        return Object(LastObject())
 
     def get_type_id(self, object_id):
         return GetType(object_id)
 
     @property
     def backpack(self):
-        return Backpack()
+        from entities.container import Container  # avoid circular import
+        return Container(Backpack())
 
     @alive_action
     def equip_weapon_type(self, weapon: WeaponBase):
@@ -154,6 +159,7 @@ class Player(Creature):
         if x <= 0 or y <= 0:
             return
 
+        # todo: check frozen
         # Xdst, Ydst, Optimized, Accuracy, Running
         return newMoveXY(x, y, optimized, accuracy, running)
 
@@ -161,20 +167,45 @@ class Player(Creature):
     @drag_cd
     def move_item(self, item_id, quantity=-1, target_id=None, x=0, y=0, z=0):
         # ItemID, Count, MoveIntoID, X, Y, Z
-        target_id = target_id or self.backpack
+        target_id = target_id or self.backpack.id_
+        target_id = getattr(target_id, 'id_', target_id)
+        item_id = getattr(item_id, 'id_', item_id)
+        if not IsObjectExists(item_id):
+            return
+
+        # if not IsMovable(item_id):
+        #     log(f"Cannot move {item_id}. Unmovable")
+        #     return
+
         log(f"Moving {quantity} of {item_id} to {target_id} {x} {y} {z}")
         return MoveItem(item_id, quantity, target_id, x, y, z)
 
     @alive_action
     @drag_cd
-    def loot_ground(self, item_id, quantity=-1):
-        log(f"Looting {quantity} of {item_id} from ground.")
+    def grab(self, item_id, quantity=-1):
+        if isinstance(item_id, Object):
+            item_id = item_id.id_
+        if not IsObjectExists(item_id):
+            return
+
+        # if not IsMovable(item_id):
+        #     log(f"Cannot grab {item_id}. Unmovable")
+        #     return
+
+        quantity_str = 'all' if quantity == -1 else quantity
+        log(f"Looting {quantity_str} of {item_id}.")
         return Grab(item_id, quantity)
 
     @alive_action
     @drag_cd
     def drop_item(self, item_id, quantity=-1):
+        item_id = getattr(item_id, 'id_', item_id)
         if quantity == 0:
+            log(f"cannot drop quantity {quantity} of {item_id}")
+            return
+
+        if not IsObjectExists(item_id):
+            log(f"cannot drop {quantity} of nonexisting {item_id}")
             return
 
         x, y, z, _ = self.coords
@@ -183,9 +214,11 @@ class Player(Creature):
 
     @use_cd
     def use_object(self, object_id):
-        if isinstance(object_id, Object):
-            object_id = object_id.id_
+        object_id = getattr(object_id, 'id_', object_id)
         if object_id in (0, None, -1):
+            return
+
+        if not IsObjectExists(object_id):
             return
 
         log(f"Using {object_id}")
@@ -268,6 +301,7 @@ class Player(Creature):
         container_ids = container_ids or [self.backpack]
         if not isinstance(container_ids, (list, tuple)):
             container_ids = [container_ids]
+        container_ids = [getattr(i, 'id_', i) for i in container_ids]
         FindTypesArrayEx(type_ids, colors, container_ids, recursive)
         output = GetFoundList()
         return output
@@ -280,7 +314,7 @@ class Player(Creature):
     @alive_action
     def find_type_backpack(self, type_id, color_id=None, recursive=True):
         color_id = color_id or -1
-        return FindTypeEx(type_id, color_id, self.backpack, recursive)
+        return FindTypeEx(type_id, color_id, self.backpack.id_, recursive)
 
     def got_item_type(self, item_type, color_id=None):
         return self.find_type_backpack(item_type, color_id=color_id)
@@ -329,6 +363,7 @@ class Player(Creature):
             self.use_object(container_id)
             tools.ping_delay()
 
+        destination_id = getattr(destination_id, 'id_', destination_id)
         return EmptyContainer(container_id, destination_id, delay)
 
     def drop_trash_items(self, trash_item_ids=None, recursive=False):
@@ -458,7 +493,7 @@ class Player(Creature):
         if notorieties:
             output = [i for i in output if i.notoriety in notorieties]
         if path_distance:
-            output = [i for i in output if i.path_distance() <= distance]
+            output = [i for i in output if i.path_distance(accuracy=1) <= distance]
 
         return list(filter(condition, output)) if condition else output
 

@@ -6,8 +6,9 @@ log = AddToSystemJournal
 
 
 class Mob(Creature):
-    def __init__(self, _id):
+    def __init__(self, _id, path_distance=99999):
         super().__init__(_id)
+        self._path_distance = path_distance
 
     @property
     def mutated(self):

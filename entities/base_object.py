@@ -9,6 +9,7 @@ class Object:
         self._id = _id
         self._color = color
         self._name = None
+        self._path_distance = 99999
 
     def __eq__(self, other):
         try:
@@ -102,7 +103,8 @@ class Object:
         if len(output) == 0 and self.x != self.player_x and self.y != self.player_y:
             return 99999  # cannot build path to the creature
 
-        return len(output)
+        self._path_distance = len(output)
+        return self._path_distance
 
     @property
     def notoriety(self) -> constants.Notoriety:

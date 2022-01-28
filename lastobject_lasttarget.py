@@ -12,9 +12,12 @@ class LastObjectLastTarget(ScriptBase):
         super().__init__()
 
     def start(self):
-        while True:
-            self.player.use_object(LastObject())
-            WaitTargetObject(LastTarget())
+        last_object = self.player.last_object
+        last_target = self.player.last_target
+        while last_object.exists and last_target.exists:
+            self.player.use_object(last_object)
+            WaitTargetObject(last_target)
+        self.quit()
 
 
 if __name__ == '__main__':
