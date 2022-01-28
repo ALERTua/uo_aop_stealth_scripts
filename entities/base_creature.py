@@ -17,8 +17,28 @@ class Creature(Object):
         return GetMaxHP(self._id)
 
     @property
+    def mana(self):
+        return GetMana(self._id)
+
+    @property
+    def max_mana(self):
+        return GetMaxMana(self._id)
+
+    @property
     def stamina(self):
         return GetStam(self._id)
+
+    @property
+    def max_stamina(self):
+        return GetMaxStam(self._id)
+
+    @property
+    def paralyzed(self):
+        return IsParalyzed(self._id)
+
+    @property
+    def poisoned(self):
+        return IsPoisoned(self._id)
 
     @property
     def hidden(self):

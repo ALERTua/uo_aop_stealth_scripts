@@ -20,3 +20,7 @@ class Item(Object):
     @property
     def quantity(self):
         return GetQuantity(self._id)
+
+
+if __name__ == '__main__':
+    pass

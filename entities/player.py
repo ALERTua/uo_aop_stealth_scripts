@@ -101,6 +101,22 @@ class Player(Creature):
         return MaxHP()
 
     @property
+    def mana(self):
+        return Mana()
+
+    @property
+    def max_mana(self):
+        return MaxMana()
+
+    @property
+    def stamina(self):
+        return Stam()
+
+    @property
+    def max_stamina(self):
+        return MaxStam()
+
+    @property
     def hidden(self):
         return Hidden()
 
@@ -124,6 +140,11 @@ class Player(Creature):
     @property
     def last_object(self):
         return Object(LastObject())
+
+    @property
+    def last_container(self):
+        from entities.container import Container  # avoid circular import
+        return Container(LastContainer())
 
     def get_type_id(self, object_id):
         return GetType(object_id)
@@ -153,13 +174,17 @@ class Player(Creature):
 
     @alive_action
     def attack(self, target_id):
-        return Attack(target_id)
+        target_id = Creature(target_id)
+        return Attack(target_id.id_)
 
     def move(self, x, y, optimized=True, accuracy=1, running=True):
         if x <= 0 or y <= 0:
             return
 
-        # todo: check frozen
+        while self.paralyzed:
+            log(f"Waiting until unParalyzed")
+            tools.result_delay()
+
         # Xdst, Ydst, Optimized, Accuracy, Running
         return newMoveXY(x, y, optimized, accuracy, running)
 
@@ -171,6 +196,7 @@ class Player(Creature):
         target_id = getattr(target_id, 'id_', target_id)
         item_id = getattr(item_id, 'id_', item_id)
         if not IsObjectExists(item_id):
+            log(f"Won't move nonexistent {item_id}")
             return
 
         # if not IsMovable(item_id):
@@ -187,10 +213,6 @@ class Player(Creature):
             item_id = item_id.id_
         if not IsObjectExists(item_id):
             return
-
-        # if not IsMovable(item_id):
-        #     log(f"Cannot grab {item_id}. Unmovable")
-        #     return
 
         quantity_str = 'all' if quantity == -1 else quantity
         log(f"Looting {quantity_str} of {item_id}.")
@@ -254,10 +276,6 @@ class Player(Creature):
                     self.move_item(got_type, GetQuantity(got_type), container_id, 0, 0, 0)
                 log(f"Moving {got_type} Done")
 
-    @property
-    def stamina(self):
-        return Stam()
-
     def say(self, text):
         return UOSay(text)
 
@@ -287,7 +305,7 @@ class Player(Creature):
     def find_types_ground(self, type_ids, colors=None, distance=2):
         if not isinstance(type_ids, Iterable):
             type_ids = [type_ids]
-        colors = colors or [0]
+        colors = colors or [0xFFFF]
         previous_distance = GetFindDistance()
         SetFindDistance(distance)
         # noinspection PyArgumentList
@@ -297,7 +315,7 @@ class Player(Creature):
 
     @alive_action
     def find_types_container(self, type_ids, colors=None, container_ids=None, recursive=False):
-        colors = colors or [0]  # no -1 here
+        colors = colors or [0xFFFF]
         container_ids = container_ids or [self.backpack]
         if not isinstance(container_ids, (list, tuple)):
             container_ids = [container_ids]
@@ -496,6 +514,14 @@ class Player(Creature):
             output = [i for i in output if i.path_distance(accuracy=1) <= distance]
 
         return list(filter(condition, output)) if condition else output
+
+    @property
+    def paralyzed(self):
+        return Paralyzed()
+
+    @property
+    def poisoned(self):
+        return Poisoned()
 
 
 if __name__ == '__main__':

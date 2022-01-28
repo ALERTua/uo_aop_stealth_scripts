@@ -5,11 +5,17 @@ log = AddToSystemJournal
 
 
 class Object:
-    def __init__(self, _id, color=None):
+    # noinspection PyProtectedMember
+    def __init__(self, _id, color=None, name=None, path_distance=99999):
+        if isinstance(_id, Object):
+            _id = _id.id_
+            color = _id.color
+            name = _id._name
+            path_distance = _id._path_distance
         self._id = _id
         self._color = color
-        self._name = None
-        self._path_distance = 99999
+        self._name = name
+        self._path_distance = path_distance
 
     def __eq__(self, other):
         try:
