@@ -106,6 +106,14 @@ class ScriptBase:
     def engage_mob(self, mob: Mob, check_health_func=None, loot=True, cut=True, drop_trash_items=True,
                    notify_only_mutated=True):
         check_health_func = check_health_func or self.check_health
+        if not mob.exists:
+            log(f"Won't engage nonexisting {mob}")
+            return
+
+        if mob.dead:
+            log(f"Won't engage dead {mob}")
+            return
+
         distance = mob.path_distance()
         if distance > 50:
             log(f"Won't engage mob that {distance} this far away")
