@@ -4,6 +4,7 @@ import pendulum
 
 from entities.base_object import Object
 from entities.container import Container
+from entities.item import Item
 from entities.mob import Mob
 from tools import constants, tools
 from entities.base_script import ScriptBase, condition, log, stealth
@@ -152,9 +153,9 @@ class Miner(ScriptBase):
             return True
         else:
             log("Moving to grab a Pickaxe")
-
             if self.in_mine:
-                return False
+                self.get_free_pickaxe()
+                return self.pickaxe
 
             self.move_to_unload()
             pickaxe = self.player.find_type(constants.TYPE_ID_TOOL_PICKAXE, MINING_CONTAINER_ID)
@@ -163,8 +164,7 @@ class Miner(ScriptBase):
                 self.quit()
 
             log("Grabbing a Pickaxe")
-            self.player.move_item(pickaxe)
-            return True
+            return self.player.grab(pickaxe)
 
     def check_bandages(self):
         return self._check_bandages(2, MINING_CONTAINER_ID)
@@ -337,7 +337,7 @@ class Miner(ScriptBase):
 
     @property
     def nearest_forge(self):
-        return self.player.find_type_ground(constants.TYPE_ID_FORGE, 20)
+        return Item.instantiate(self.player.find_type_ground(constants.TYPE_ID_FORGE, 20))
 
     def smelt(self):
         if not SMELT:
@@ -375,7 +375,7 @@ class Miner(ScriptBase):
             x, y = container_coords
             container = Container.instantiate(container_id, x=x, y=y, fixed_coords=True)
             log(f"Getting free pickaxe from {container}")
-            self.player.move_to_object(container, accuracy=2, running=self.should_run)
+            self.player.move_to_object(container, accuracy=1, running=self.should_run)
             self.player.loot_container(container)
 
     def unload_and_return(self):

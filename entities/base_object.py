@@ -20,7 +20,7 @@ class Object:
 
     def __eq__(self, other):
         try:
-            return self.id_ == other.id_
+            return (type(self) == type(other)) and (self.id_ == other.id_)
         except:
             return False
 
@@ -32,7 +32,7 @@ class Object:
 
     @classmethod
     def instantiate(cls, obj, *args, **kwargs):
-        if isinstance(obj, cls):
+        if isinstance(obj, (cls, *cls.__subclasses__())):
             return obj
 
         if isinstance(obj, Object):  # todo: not perfect
@@ -59,6 +59,13 @@ class Object:
     @color.setter
     def color(self, value):
         self._color = value
+
+    @property
+    def parent(self):
+        parent = GetParent(self.id_)
+        if parent:
+            from entities.container import Container  # avoid cyclic import
+            return Container.instantiate(parent)
 
     @property
     def exists(self):
@@ -188,3 +195,6 @@ class Object:
     @property
     def invulnerable(self):
         return self.notoriety == constants.Notoriety.Invulnerable
+
+    def hide(self):
+        return  # ClientHide(self.id_)  # never gets the result and hangs forever

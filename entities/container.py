@@ -1,14 +1,15 @@
 from entities.item import Item
-from tools import constants
 from py_stealth import *
-from .base_object import Object
 
 log = AddToSystemJournal
 
 
-class Container(Object):
+class Container(Item):
     def __init__(self, _id, **kwargs):
         super().__init__(_id, **kwargs)
+
+    def __str__(self):
+        return f"[{self.__class__.__name__}]({hex(self._id)}){self.name}"
 
     @property
     def is_empty(self):
