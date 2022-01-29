@@ -3,14 +3,11 @@ from copy import copy
 import pendulum
 
 from entities.base_object import Object
-from entities.item import Item
+from entities.container import Container
 from entities.mob import Mob
-from entities.player import alive_action
 from tools import constants, tools
-from entities.base_script import ScriptBase
-from py_stealth import *
+from entities.base_script import ScriptBase, condition, log, stealth
 
-log = AddToSystemJournal
 
 debug = True
 MINE_IRON = True
@@ -31,6 +28,34 @@ MINE_ENTRANCE_COORDS = (2427, 177)
 MINING_CONTAINER_ID = 0x728BAB4E
 MINING_CONTAINER_COORDS = (2462, 183)
 MINE_FORGE_COORDS = (2413, 184)
+MINING_LOOT = [
+    *constants.TYPE_IDS_LOOT,
+    constants.TYPE_ID_INGOT,
+    constants.TYPE_ID_ORE,
+    constants.TYPE_ID_BANDAGE,
+    constants.TYPE_ID_TOOL_PICKAXE,
+    constants.TYPE_ID_HIDE,
+    constants.TYPE_ID_HATCHET,  # mobs occasionaly drop hatchets
+    constants.TYPE_ID_SCEPTER,
+    constants.TYPE_ID_WAND,
+]
+ITEM_IDS_MINING_TRASH = [
+    *constants.ITEM_IDS_TRASH,
+    *constants.TYPE_IDS_ARMOR_BONE,
+    constants.TYPE_ID_SHIELD_WOODEN,
+    constants.TYPE_ID_HELMET,
+    constants.TYPE_ID_SKINNING_KNIFE,
+    constants.TYPE_ID_MEAT_CLEAVER,
+    constants.TYPE_ID_BUTCHER_KNIFE,
+    constants.TYPE_ID_SCIMITAR,
+    constants.TYPE_ID_PLATE_GLOVES,
+    constants.TYPE_ID_PLATE_SLEEVES,
+    *constants.TYPE_ID_STAFFS,
+    constants.TYPE_ID_MACE,
+    constants.TYPE_ID_DAGGER,
+    *constants.TYPE_ID_SCROLLS,
+]
+MINING_LOOT = [i for i in MINING_LOOT if i not in ITEM_IDS_MINING_TRASH]
 MINING_SPOTS = [
     (2410, 184),
     (2410, 181),
@@ -88,6 +113,8 @@ class Miner(ScriptBase):
         self._directions = []
         self._mining_spot = None
         self._direction = None
+        x, y = MINING_CONTAINER_COORDS
+        self.loot_container = Container.instantiate(MINING_CONTAINER_ID, x=x, y=y, z=None, fixed_coords=True)
         self.drop_types = [
             (constants.TYPE_ID_ORE, constants.COLOR_ORE_IRON, constants.WEIGHT_ORE),
             (constants.TYPE_ID_INGOT, constants.COLOR_INGOT_IRON, constants.WEIGHT_INGOT),
@@ -95,24 +122,26 @@ class Miner(ScriptBase):
             (constants.TYPE_ID_INGOT, -1, constants.WEIGHT_INGOT)
         ]
 
-    def loot_corpses(self):
-        if not LOOT_CORPSES:
-            return
-
-        return super().loot_corpses()
+    @condition(LOOT_CORPSES)
+    def loot_corpses(self, **kwargs):
+        return super().loot_corpses(drop_trash_items=True, trash_items=ITEM_IDS_MINING_TRASH)
 
     def move_to_unload(self):
-        log("Moving to unload")
-        if self.in_mine:
-            self.go_to_mine_entrance()
-        self.wait_stamina()
-        self.player.move(*MINING_CONTAINER_COORDS)
-        UseObject(MINING_CONTAINER_ID)
-        UseObject(MINING_CONTAINER_ID)
+        self.parse_commands()
+        dist_to_container = stealth.Dist(self.player.x, self.player.y, *MINING_CONTAINER_COORDS)
+        if dist_to_container > 1:
+            log("Moving to unload")
+            if self.in_mine:
+                self.go_to_mine_entrance()
+            self.wait_stamina()
+            self.player.move(*self.loot_container.xy)
+        tools.ping_delay()
+        if not self.player.open_container(self.loot_container):
+            tools.telegram_message(f"Failed to open {self.loot_container}")
         log("Moving to unload done")
 
-    def eat(self):
-        return self._eat(MINING_CONTAINER_ID)
+    def eat(self, **kwargs):
+        return super().eat(MINING_CONTAINER_ID)
 
     @property
     def pickaxe(self):
@@ -123,17 +152,18 @@ class Miner(ScriptBase):
             return True
         else:
             log("Moving to grab a Pickaxe")
+
             if self.in_mine:
                 return False
 
             self.move_to_unload()
-            pickaxes = FindType(constants.TYPE_ID_TOOL_PICKAXE, MINING_CONTAINER_ID)
-            if not pickaxes:
+            pickaxe = self.player.find_type(constants.TYPE_ID_TOOL_PICKAXE, MINING_CONTAINER_ID)
+            if not pickaxe:
                 log("WARNING! NO SPARE PICKAXES FOUND!")
                 self.quit()
 
             log("Grabbing a Pickaxe")
-            self.player.move_item(pickaxes)
+            self.player.move_item(pickaxe)
             return True
 
     def check_bandages(self):
@@ -142,19 +172,15 @@ class Miner(ScriptBase):
     def unload(self):
         log("Unloading")
         self.move_to_unload()
-        unload_types = [
-            constants.TYPE_ID_ORE,
-            constants.TYPE_ID_INGOT,
-            *constants.TYPE_IDS_LOOT,
-            *constants.TYPE_IDS_MINING_LOOT
-        ]
-        self.player.unload_types(unload_types, MINING_CONTAINER_ID)
+        self.move_to_unload()
+        self.player.unload_types(MINING_LOOT, MINING_CONTAINER_ID)
         self.check_pickaxes()
         self.check_bandages()
         self.rearm_from_container()
         self.eat()
 
     def go_to_mine_entrance(self):
+        self.parse_commands()
         self.wait_stamina()
         self.check_overweight()
         log(f"Going to the mine")
@@ -199,7 +225,7 @@ class Miner(ScriptBase):
         self._direction = self.directions.pop(0)
         log(f"{len(self._mining_spots)}/{len(MINING_SPOTS)} {self._mining_spot} {old_direction} depleeted. "
             f"Going: {len(self.directions)}/{len(DIRECTIONS)} {self._direction}.")
-        ClearJournal()
+        stealth.ClearJournal()
 
     @property
     def in_mine(self):
@@ -207,9 +233,8 @@ class Miner(ScriptBase):
         mine_entrance_x, _ = MINE_ENTRANCE_COORDS
         return x <= mine_entrance_x
 
-    def pick_up_items(self):
-        type_ids = constants.TYPE_IDS_MINING_LOOT
-        return self._pick_up_items(type_ids)
+    def pick_up_items(self, **kwargs):
+        return super().pick_up_items(MINING_LOOT)
 
     def engage_mob(self, mob: Mob, *args, **kwargs):
         return super().engage_mob(mob=mob, check_health_func=self.mine_check_health, loot=LOOT_CORPSES, cut=CUT_CORPSES,
@@ -240,6 +265,7 @@ class Miner(ScriptBase):
             self.move_mining_spot()
 
     def move_mining_spot(self):
+        self.parse_commands()
         self.check_overweight()
         self.wait_stamina(5)
         _ = self.direction
@@ -250,8 +276,8 @@ class Miner(ScriptBase):
         self.general_weight_check()
 
     def mine_direction(self):
-        ClearJournal()
         while self.player.overweight:  # consider near_max_weight
+            self.parse_commands()
             self.general_weight_check()
         if SMELT:  # consider near_max_weight
             while self.in_mine and self.player.overweight and self.move_mining_spot() is None and self.got_ore:
@@ -259,7 +285,9 @@ class Miner(ScriptBase):
                 self.move_mining_spot()
 
         self.move_mining_spot()
+        stealth.ClearJournal()
         self.player.mine(self.direction)
+        self.parse_commands()
 
     def do_mining(self):
         self.mine_direction()
@@ -305,7 +333,7 @@ class Miner(ScriptBase):
                 self.mine_direction()
                 i = 0
 
-            Wait(constants.USE_COOLDOWN)
+            stealth.Wait(constants.USE_COOLDOWN)
 
     @property
     def nearest_forge(self):
@@ -333,23 +361,22 @@ class Miner(ScriptBase):
         # noinspection PyProtectedMember
         return self.player.got_item_type(constants.TYPE_ID_ORE)
 
-    def drop_overweight_items(self, drop_types=None, **kwargs):
+    def drop_overweight_items(self, **kwargs):
         return super().drop_overweight_items(self.drop_types)
 
-    def check_overweight(self, drop_types=None, **kwargs):
+    def check_overweight(self, **kwargs):
         return super().check_overweight(drop_types=self.drop_types)
 
+    @condition(GET_FREE_PICKAXE)
     def get_free_pickaxe(self):
-        if not GET_FREE_PICKAXE:
-            return
-
         self.check_overweight()
         self.wait_stamina()
-        for container, container_coords in FREE_PICKAXE_CONTAINERS.items():
-            container_obj = Object(container)
-            log(f"Getting free pickaxe from {container_obj}")
-            self.player.move(*container_coords, accuracy=2, running=self.should_run)
-            self.player.loot_container(container_obj)
+        for container_id, container_coords in FREE_PICKAXE_CONTAINERS.items():
+            x, y = container_coords
+            container = Container.instantiate(container_id, x=x, y=y, fixed_coords=True)
+            log(f"Getting free pickaxe from {container}")
+            self.player.move_to_object(container, accuracy=2, running=self.should_run)
+            self.player.loot_container(container)
 
     def unload_and_return(self):
         self.unload()
@@ -367,26 +394,26 @@ class Miner(ScriptBase):
                 self.unload()
             return True  # to force mine next direction after smelting
 
+    @condition(EQUIP_WEAPONS_FROM_GROUND)
     def check_weapon(self, **kwargs):
-        if not EQUIP_WEAPONS_FROM_GROUND:
-            return
-
         return super().check_weapon(max_weapon_search_distance=MAX_WEAPON_SEARCH_DISTANCE)
 
+    @condition(EQUIP_WEAPONS_FROM_LOOT_CONTAINER)
     def rearm_from_container(self, **kwargs):
-        if not EQUIP_WEAPONS_FROM_LOOT_CONTAINER:
-            return
-
         return super().rearm_from_container(container_id=MINING_CONTAINER_ID)
 
     def start(self):
+        # stealth.SetEventProc('evtimer1', self.callback_command_parser)
         self._start_time = pendulum.now()
         dist_to_container = self.player.path_distance_to(*MINING_CONTAINER_COORDS)
         if dist_to_container < 20:
             self.move_to_unload()
 
         self.general_weight_check()
-        if not self.in_mine:
+        if self.in_mine:
+            if not self.pickaxe:
+                self.get_free_pickaxe()
+        else:
             self.go_to_mine_entrance()
             self.get_free_pickaxe()
 

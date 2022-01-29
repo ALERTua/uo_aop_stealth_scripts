@@ -1,4 +1,3 @@
-from collections import namedtuple
 from copy import copy
 
 import pendulum
@@ -6,10 +5,7 @@ import pendulum
 from entities.item import Item
 from entities.mob import Mob
 from tools import tools, constants
-from entities.base_script import ScriptBase
-from py_stealth import *
-
-log = AddToSystemJournal
+from entities.base_script import ScriptBase, log, stealth
 
 debug = True
 ROAM_COORDS = [
@@ -64,7 +60,7 @@ class FarmCritter(ScriptBase):
 
     def move_to_unload(self):
         self.parse_commands()
-        dist_to_container = Dist(self.player.x, self.player.y, *LOOT_CONTAINER_COORDS)
+        dist_to_container = stealth.Dist(self.player.x, self.player.y, *LOOT_CONTAINER_COORDS)
         if dist_to_container > 1:
             log("Moving to unload")
             self.wait_stamina()
@@ -76,8 +72,8 @@ class FarmCritter(ScriptBase):
     def check_bandages(self):
         return self._check_bandages(HOLD_BANDAGES, LOOT_CONTAINER_ID)
 
-    def eat(self):
-        return self._eat(LOOT_CONTAINER_ID)
+    def eat(self, **kwargs):
+        return super().eat(container_id=LOOT_CONTAINER_ID)
 
     def unload(self):
         log("Unloading")
@@ -95,14 +91,14 @@ class FarmCritter(ScriptBase):
         self.check_weapon()
         self.eat()
 
-    def pick_up_items(self):
+    def pick_up_items(self, **kwargs):
         type_ids = [
             constants.TYPE_ID_LOGS,
             *constants.TYPE_IDS_LOOT,
             *constants.TYPE_IDS_LJ_LOOT,
             *constants.TYPE_IDS_MINING_LOOT,
         ]
-        return self._pick_up_items(type_ids)
+        return super().pick_up_items(type_ids)
 
     def general_weight_check(self):
         if self.player.near_max_weight:
@@ -146,7 +142,7 @@ class FarmCritter(ScriptBase):
             found_weapon_type = self.player.find_type(weapon_type_id, LOOT_CONTAINER_ID)
             if not found_weapon_type:
                 continue
-            found_weapons = GetFoundList()
+            found_weapons = stealth.GetFoundList()
             container_weapon_ids.extend(found_weapons)
 
         if not container_weapon_ids:
@@ -155,7 +151,7 @@ class FarmCritter(ScriptBase):
             self.quit()
             return
 
-        weapon_obj = Item(container_weapon_ids[0])
+        weapon_obj = Item.instantiate(container_weapon_ids[0])
         while not self.player.weapon_equipped:
             log(f"Equipping weapon {weapon_obj}")
             self.player.equip_weapon_id(weapon_obj)
@@ -174,7 +170,7 @@ class FarmCritter(ScriptBase):
     def start(self):
         self._start_time = pendulum.now()
         self.general_weight_check()
-        dist_to_container = Dist(self.player.x, self.player.y, *LOOT_CONTAINER_COORDS)
+        dist_to_container = stealth.Dist(self.player.x, self.player.y, *LOOT_CONTAINER_COORDS)
         if dist_to_container < 20:
             self.unload()
 

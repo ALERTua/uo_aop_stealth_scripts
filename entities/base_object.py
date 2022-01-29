@@ -5,17 +5,18 @@ log = AddToSystemJournal
 
 
 class Object:
-    # noinspection PyProtectedMember
-    def __init__(self, _id, color=None, name=None, path_distance=99999):
-        if isinstance(_id, Object):
-            _id = _id.id_
-            color = _id.color
-            name = _id._name
-            path_distance = _id._path_distance
+    def __init__(self, _id, type_id=None, color=None, name=None, path_distance=99999, x=None, y=None, z=None,
+                 fixed_coords=False, _direct=True):
+        assert _direct is False, "Please use .instantiate classmethod"
         self._id = _id
+        self._type_id = type_id
         self._color = color
         self._name = name
         self._path_distance = path_distance
+        self._x = x
+        self._y = y
+        self._z = z
+        self.fixed_coords = fixed_coords
 
     def __eq__(self, other):
         try:
@@ -24,15 +25,30 @@ class Object:
             return False
 
     def __str__(self):
-        return f"[{self.__class__.__name__}]({self._id}){self.name}"
+        return f"[{self.__class__.__name__}]({hex(self._id)}){self.name}"
+
+    def __repr__(self):
+        return self.__str__()
+
+    @classmethod
+    def instantiate(cls, obj, *args, **kwargs):
+        if isinstance(obj, cls):
+            return obj
+
+        if isinstance(obj, Object):  # todo: not perfect
+            return cls(obj._id, _direct=False, *args, **kwargs)
+
+        return cls(obj, _direct=False, *args, **kwargs)
 
     @property
     def id_(self):
         return self._id
 
     @property
-    def type_(self):
-        return GetType(self._id)
+    def type_id(self):
+        if self._type_id is None:
+            self._type_id = GetType(self._id)
+        return self._type_id
 
     @property
     def color(self):
@@ -60,14 +76,23 @@ class Object:
 
     @property
     def x(self):
+        if self.fixed_coords:
+            return self._x
+
         return GetX(self._id)
 
     @property
     def y(self):
+        if self.fixed_coords:
+            return self._y
+
         return GetY(self._id)
 
     @property
     def z(self):
+        if self.fixed_coords:
+            return self._z
+
         return GetZ(self._id)
 
     @property

@@ -1,12 +1,12 @@
 from enum import Enum, unique
 from .constants_weapons import *
 from .constants_armor import *
-from .constants_creatures import *
-from .constants_scrolls import *
 from .constants_gems import *
 from .constants_reagents import *
 from .constants_food import *
+from .constants_scrolls import *
 from .constants_colors import *
+from .constants_creatures import *
 
 
 @unique
@@ -50,7 +50,7 @@ TYPE_ID_CORPSE = 0x2006
 TYPE_ID_HIDE = 0x1078
 TYPE_ID_FEATHERS = 0x1BD1
 
-# TILES
+# FISHING
 TYPE_ID_TILE_FISHING = [
     0x179A,
     0x179B,
@@ -59,24 +59,10 @@ TYPE_ID_TILE_FISHING = [
     0x1799,
 ]
 
-# FISH
 TYPE_ID_FISH = [
     0x09CE,
     0x09CD,
     0x09CC,
-]
-TYPE_IDS_FISH_TRASH = [
-    0x1AE1,
-    0x1AE2,
-    0x1AE4,
-    0x1EA3,
-    0x1EA5,
-    0x0F7A,  # painting
-    0x0EC8,
-    0x0FC4,
-    0x0FC7,
-    0x0FC8,
-    TYPE_ID_SHIELD_BRONZE,
 ]
 
 # CRAFT
@@ -85,6 +71,7 @@ TYPE_ID_ORE = 0x19B9
 TYPE_ID_INGOT = 0x1BF2
 TYPE_ID_LOGS = 0x1BE0
 TYPE_ID_FORGE = 0x0FB1
+
 
 # TOOLS
 TYPE_ID_TOOL_FISHING_POLE = 3519
@@ -125,48 +112,10 @@ TYPE_IDS_LOOT = [
     *TYPE_IDS_REAGENT,
 ]
 
-TYPE_IDS_MINING_LOOT = [
-    *TYPE_IDS_LOOT,
-    TYPE_ID_INGOT,
-    TYPE_ID_ORE,
-    TYPE_ID_BANDAGE,
-    TYPE_ID_TOOL_PICKAXE,
-    TYPE_ID_HIDE,
-    TYPE_ID_HATCHET,  # mobs occasionaly drop hatchets
-    TYPE_ID_SCEPTER,
-    TYPE_ID_WAND,
-]
-
-TYPE_IDS_LJ_LOOT = [
-    *TYPE_IDS_LOOT,
-    # TYPE_ID_BANDAGE,
-    # TYPE_ID_HATCHET,
-    TYPE_ID_LOGS,
-    TYPE_ID_HIDE,
-]
-
 ITEM_IDS_TRASH = [
     *TYPE_ID_GEMS,
     *TYPE_IDS_RAW_FOOD,
 ]
-
-ITEM_IDS_MINING_TRASH = [
-    *ITEM_IDS_TRASH,
-    *TYPE_IDS_ARMOR_BONE,
-    TYPE_ID_SHIELD_WOODEN,
-    TYPE_ID_HELMET,
-    TYPE_ID_SKINNING_KNIFE,
-    TYPE_ID_MEAT_CLEAVER,
-    TYPE_ID_BUTCHER_KNIFE,
-    TYPE_ID_SCIMITAR,
-    TYPE_ID_PLATE_GLOVES,
-    TYPE_ID_PLATE_SLEEVES,
-    *TYPE_ID_STAFFS,
-    TYPE_ID_MACE,
-    TYPE_ID_DAGGER,
-    *TYPE_ID_SCROLLS,
-]
-TYPE_IDS_MINING_LOOT = [i for i in TYPE_IDS_MINING_LOOT if i not in ITEM_IDS_MINING_TRASH]
 
 
 if __name__ == '__main__':

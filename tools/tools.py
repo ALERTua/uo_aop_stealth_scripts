@@ -3,6 +3,7 @@ import os
 import re
 
 from py_stealth import *
+from tools import constants
 
 log = AddToSystemJournal
 
@@ -79,6 +80,10 @@ def ping_delay():
 
 def result_delay():
     return _delay(500)
+
+
+def useobject_delay():
+    return _delay(constants.USE_COOLDOWN)
 
 
 def __main():

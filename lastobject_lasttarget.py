@@ -1,8 +1,5 @@
+from entities.base_script import ScriptBase, log, stealth
 from tools import tools
-from entities.base_script import ScriptBase
-from py_stealth import *
-
-log = AddToSystemJournal
 
 debug = False
 
@@ -16,7 +13,7 @@ class LastObjectLastTarget(ScriptBase):
         last_target = self.player.last_target
         while last_object.exists and last_target.exists:
             self.player.use_object(last_object)
-            WaitTargetObject(last_target)
+            stealth.WaitTargetObject(last_target)
         self.quit()
 
 

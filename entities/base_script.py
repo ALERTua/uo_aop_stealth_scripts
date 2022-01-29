@@ -1,6 +1,7 @@
 import signal
 import atexit
 from copy import copy
+from functools import wraps
 
 import pendulum
 import pprint
@@ -9,9 +10,24 @@ from tools import constants, tools
 from .item import Item
 from .mob import Mob
 from .player import Player, alive_action
-from py_stealth import *
+import py_stealth as stealth
 
-log = AddToSystemJournal
+log = stealth.AddToSystemJournal
+
+
+def condition(condition_):
+    def real_decorator(func):
+        @wraps(func)
+        def requires_constant_wrapper(self, *args, **kwargs):
+            if not condition_:
+                return 666
+
+            result = func(self, *args, **kwargs)
+            return result
+
+        return requires_constant_wrapper
+
+    return real_decorator
 
 
 class ScriptBase:
@@ -25,6 +41,7 @@ class ScriptBase:
         self._commands_cooldown = {}
         self._looted_corpses = []
         self._checked_weapons = []
+        self._event_timer_1 = 0
         atexit.register(self.at_exit)
 
     def _register_signals(self):
@@ -42,7 +59,7 @@ class ScriptBase:
     def stop(self):
         log(f"Stopping {self}")
         self.at_exit()
-        StopAllScripts()
+        stealth.StopAllScripts()
 
     def _parse_command(self, command):
         return tools.in_journal(f'{self.player.name}: {command}') and not self._commmand_on_cooldown(command)
@@ -95,16 +112,16 @@ class ScriptBase:
         log(f"Stamina reached {threshold}")
 
     @alive_action
-    def _pick_up_items(self, type_ids):
-        for type_id in type_ids:
-            while (loot := self.player.find_type_ground(type_id, constants.MAX_PICK_UP_DISTANCE)) \
-                    and not self.player.grab(loot):
-                log(f"Looting {loot}")
-                tools.ping_delay()
+    def pick_up_items(self, type_ids):
+        found_items = self.player.find_types_ground(type_ids, distance=constants.MAX_PICK_UP_DISTANCE)
+        for item in found_items:
+            while item.exists and not self.player.grab(item):
+                log(f"Looting {item}")
+                tools.result_delay()
 
     @alive_action
     def engage_mob(self, mob: Mob, check_health_func=None, loot=True, cut=True, drop_trash_items=True,
-                   notify_only_mutated=True):
+                   notify_only_mutated=True, trash_items=None):
         check_health_func = check_health_func or self.check_health
         if not mob.exists:
             log(f"Won't engage nonexisting {mob}")
@@ -120,6 +137,8 @@ class ScriptBase:
             return
 
         log(f"Engaging {mob} distance {mob.path_distance()}")
+        if mob.mutated:
+            stealth.Alarm()
         while mob.alive:
             self.player.move(mob.x, mob.y)
             self.player.attack(mob.id_)
@@ -130,17 +149,19 @@ class ScriptBase:
         if loot:
             self.player.loot_nearest_corpse(cut_corpse=cut, drop_trash_items=drop_trash_items)
 
-    def drop_trash(self):
-        return self.player.drop_trash_items(constants.ITEM_IDS_MINING_TRASH)
+    def drop_trash(self, trash_items=None):
+        trash_items = trash_items or constants.ITEM_IDS_TRASH
+        return self.player.drop_trash_items(trash_items)
 
-    def loot_corpses(self):
+    def loot_corpses(self, drop_trash_items=True, trash_items=None):
         for corpse in self.player.find_types_ground(constants.TYPE_ID_CORPSE):
             if corpse in self._looted_corpses:
                 continue
 
-            self.player.loot_nearest_corpse(corpse_id=corpse, cut_corpse=False)
+            self.player.loot_nearest_corpse(corpse_id=corpse, cut_corpse=False, drop_trash_items=drop_trash_items,
+                                            trash_items=trash_items)
             self._looted_corpses.append(corpse)
-        self.player.drop_trash_items()
+        self.player.drop_trash_items(trash_item_ids=trash_items)
 
     def check_overweight(self, drop_types=None):
         if not self.player.overweight:  # consider near_max_weight
@@ -169,8 +190,8 @@ class ScriptBase:
                 if not drop_object_id:
                     break
 
-                drop_object_name = GetName(drop_object_id)
-                drop_object_quantity = GetQuantity(drop_object_id)
+                drop_object_name = stealth.GetName(drop_object_id)
+                drop_object_quantity = stealth.GetQuantity(drop_object_id)
                 if not drop_object_quantity:
                     break
 
@@ -184,11 +205,14 @@ class ScriptBase:
                 drop_result = self.player.drop_item(drop_object_id, drop_quantity)
                 tools.result_delay()
                 new_item_id = self.player.find_type_backpack(drop_type, drop_color)
-                if drop_result or (new_item_id != drop_object_id or drop_object_quantity != GetQuantity(new_item_id)):
+                if drop_result or (new_item_id != drop_object_id
+                                   or drop_object_quantity != stealth.GetQuantity(new_item_id)):
                     log(f"Drop successful")
                     break
 
-    def quit(self):
+    def quit(self, alarm=True):
+        if alarm:
+            stealth.Alarm()
         log("Quitting")
         self.at_exit()
         self.disconnect()
@@ -196,9 +220,9 @@ class ScriptBase:
 
     @staticmethod
     def disconnect():
-        SetARStatus(False)
-        Disconnect()
-        CorrectDisconnection()
+        stealth.SetARStatus(False)
+        stealth.Disconnect()
+        stealth.CorrectDisconnection()
 
     @property
     def script_running_time(self):
@@ -226,14 +250,14 @@ class ScriptBase:
 
     @alive_action
     def got_bandages(self, quantity):
-        return GetQuantity(self.player.find_type_backpack(constants.TYPE_ID_BANDAGE)) == quantity
+        return stealth.GetQuantity(self.player.find_type_backpack(constants.TYPE_ID_BANDAGE)) == quantity
 
     @alive_action
     def _check_bandages(self, quantity, container_id):
         log("Checking Bandages")
         player_bandages = self.player.got_bandages
-        if not player_bandages or GetQuantity(player_bandages) < quantity:
-            bandages = FindType(constants.TYPE_ID_BANDAGE, container_id)
+        if not player_bandages or stealth.GetQuantity(player_bandages) < quantity:
+            bandages = stealth.FindType(constants.TYPE_ID_BANDAGE, container_id)
             if not bandages:
                 log("WARNING! NO SPARE BANDAGES FOUND!")
                 tools.telegram_message(f"{self.player}: No bandages found. "
@@ -246,10 +270,10 @@ class ScriptBase:
                 tools.ping_delay()
 
     @alive_action
-    def _eat(self, container_id, food_type=None):
+    def eat(self, container_id, food_type=None):
         food_type = food_type or constants.TYPE_ID_FOOD_FISHSTEAKS
         log("Eating")
-        food = FindType(food_type, container_id)
+        food = stealth.FindType(food_type, container_id)
         if not food:
             log("WARNING! NO FOOD FOUND!")
             tools.telegram_message(f"{self.player}: No food found", disable_notification=True)
@@ -266,7 +290,7 @@ class ScriptBase:
                     continue
 
                 # noinspection PyProtectedMember
-                mob = Mob(creature.id_, path_distance=creature._path_distance)
+                mob = Mob.instantiate(creature.id_, path_distance=creature._path_distance)
                 if not notify_only_mutated or (notify_only_mutated and mob.mutated):
                     tools.telegram_message(f"{mob} detected at distance {mob.path_distance()}",
                                            disable_notification=not mob.mutated)
@@ -301,7 +325,7 @@ class ScriptBase:
             if not found_weapon:
                 continue
 
-            self.player.equip_object(found_weapon, RhandLayer())
+            self.player.equip_object(found_weapon, stealth.RhandLayer())
             tools.result_delay()
 
     @alive_action
@@ -325,7 +349,7 @@ class ScriptBase:
                     weapon_types.remove(weapon_type)
                     continue
 
-                found_weapon = Item(found_weapon)
+                found_weapon = Item.instantiate(found_weapon)
                 if found_weapon in self._checked_weapons:
                     weapon_types.remove(weapon_type)
                     continue

@@ -5,8 +5,8 @@ log = AddToSystemJournal
 
 
 class Creature(Object):
-    def __init__(self, _id):
-        super().__init__(_id)
+    def __init__(self, _id, **kwargs):
+        super().__init__(_id=_id, **kwargs)
 
     @property
     def hp(self):

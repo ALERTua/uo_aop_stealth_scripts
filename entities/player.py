@@ -7,10 +7,11 @@ import pendulum
 
 from entities.base_object import Object
 from entities.item import Item
+from py_stealth import *
 from tools import constants, tools
 from .base_creature import Creature
 from .base_weapon import WeaponBase
-from py_stealth import *
+from .container import Container
 
 log = AddToSystemJournal
 
@@ -87,7 +88,7 @@ def mining_cd(func):
 # noinspection PyMethodMayBeStatic
 class Player(Creature):
     def __init__(self):
-        super().__init__(_id=Self())
+        super().__init__(_id=Self(), _direct=False)
         self._skill_cd = pendulum.now()
         self._drag_cd = pendulum.now()
         self._use_cd = pendulum.now()
@@ -135,24 +136,22 @@ class Player(Creature):
 
     @property
     def last_target(self):
-        return Object(LastTarget())
+        return Object.instantiate(LastTarget())
 
     @property
     def last_object(self):
-        return Object(LastObject())
+        return Object.instantiate(LastObject())
 
     @property
     def last_container(self):
-        from entities.container import Container  # avoid circular import
-        return Container(LastContainer())
+        return Container.instantiate(LastContainer())
 
     def get_type_id(self, object_id):
         return GetType(object_id)
 
     @property
     def backpack(self):
-        from entities.container import Container  # avoid circular import
-        return Container(Backpack())
+        return Container.instantiate(Backpack(), name=f"{self.name}'s Backpack")
 
     @alive_action
     def equip_weapon_type(self, weapon: WeaponBase):
@@ -172,10 +171,37 @@ class Player(Creature):
     def open_backpack(self):
         return self.use_object(self.backpack)
 
+    def _open_container(self, id_):
+        self.use_object(id_)
+        for _ in range(1):  # double check result
+            tools.result_delay()
+            if LastContainer() == id_:
+                return True
+
+        return False
+
+    def open_container(self, container, max_tries=10):
+        container = Container.instantiate(container)
+        if not container.exists or not container.is_container:
+            return
+
+        i = 0
+        while not self._open_container(container.id_):
+            i += 1
+            if i >= max_tries:
+                log(f"Couldn't open {container} after {max_tries} tries")
+                return False
+
+        return True
+
     @alive_action
     def attack(self, target_id):
-        target_id = Creature(target_id)
+        target_id = Creature.instantiate(target_id)
         return Attack(target_id.id_)
+
+    def move_to_object(self, obj, optimized=True, accuracy=1, running=True):
+        obj = Object.instantiate(obj)
+        return self.move(obj.x, obj.y, optimized=optimized, accuracy=accuracy, running=running)
 
     def move(self, x, y, optimized=True, accuracy=1, running=True):
         if x <= 0 or y <= 0:
@@ -209,14 +235,13 @@ class Player(Creature):
     @alive_action
     @drag_cd
     def grab(self, item_id, quantity=-1):
-        if isinstance(item_id, Object):
-            item_id = item_id.id_
-        if not IsObjectExists(item_id):
+        item = Item.instantiate(item_id)
+        if not item.exists:
             return
 
         quantity_str = 'all' if quantity == -1 else quantity
         log(f"Looting {quantity_str} of {item_id}.")
-        return Grab(item_id, quantity)
+        return Grab(item.id_, quantity)
 
     @alive_action
     @drag_cd
@@ -293,7 +318,8 @@ class Player(Creature):
         SetWarMode(False)
 
     def find_type(self, type_id, container=None):
-        return FindType(type_id, container)
+        container = Container.instantiate(container)
+        return FindType(type_id, container.id_)
 
     def find_type_ground(self, type_id, distance=2):
         previous_distance = GetFindDistance()
@@ -317,11 +343,11 @@ class Player(Creature):
     def find_types_container(self, type_ids, colors=None, container_ids=None, recursive=False):
         colors = colors or [0xFFFF]
         container_ids = container_ids or [self.backpack]
-        if not isinstance(container_ids, (list, tuple)):
-            container_ids = [container_ids]
-        container_ids = [getattr(i, 'id_', i) for i in container_ids]
+        containers = [Container.instantiate(i) for i in container_ids]
+        container_ids = [i.id_ for i in containers]
         FindTypesArrayEx(type_ids, colors, container_ids, recursive)
         output = GetFoundList()
+        output = [Item.instantiate(i) for i in output]
         return output
 
     def find_types_backpack(self, type_ids, colors=None, recursive=False):
@@ -369,20 +395,18 @@ class Player(Creature):
 
     def loot_container(self, container_id, destination_id=None, delay=constants.LOOT_COOLDOWN,
                        use_container_before_looting=True):
-        if isinstance(container_id, Object):
-            container_id = container_id.id_
-        if not IsContainer(container_id):
-            log(f"Cannot loot container {container_id}. It is not a container.")
+        container = Container.instantiate(container_id)
+        if not container.is_container:
+            log(f"Cannot loot container {container}. It is not a container.")
             return False
 
-        destination_id = destination_id or self.backpack
+        destination = Container.instantiate(destination_id) if destination_id else self.backpack
         delay = delay or constants.LOOT_COOLDOWN
         if use_container_before_looting:
-            self.use_object(container_id)
-            tools.ping_delay()
+            if not self.open_container(container):
+                return
 
-        destination_id = getattr(destination_id, 'id_', destination_id)
-        return EmptyContainer(container_id, destination_id, delay)
+        return EmptyContainer(container.id_, destination.id_, delay)
 
     def drop_trash_items(self, trash_item_ids=None, recursive=False):
         trash_item_ids = trash_item_ids or constants.ITEM_IDS_TRASH
@@ -392,7 +416,7 @@ class Player(Creature):
                     self.drop_item(item)
 
     def loot_nearest_corpse(self, corpse_id=None, range_=constants.USE_GROUND_RANGE, cut_corpse=True,
-                            drop_trash_items=True):
+                            drop_trash_items=True, trash_items=None):
         # todo: notoriety check
         range_ = range_ or constants.USE_GROUND_RANGE
         corpse_id = corpse_id or self.find_type_ground(constants.TYPE_ID_CORPSE, range_)
@@ -400,12 +424,12 @@ class Player(Creature):
             return False
 
         if cut_corpse:
-            corpse_obj = Object(corpse_id)
-            self.move(corpse_obj.x, corpse_obj.y)
+            corpse = Object.instantiate(corpse_id)
+            self.move_to_object(corpse)
             self.cut_corpse(corpse_id)
         self.loot_container(corpse_id)
         if drop_trash_items:
-            self.drop_trash_items()
+            self.drop_trash_items(trash_item_ids=trash_items)
 
     def cut_corpse(self, corpse_id):  # todo: notoriety check
         containers = [RhandLayer(), LhandLayer(), self.backpack]
@@ -504,10 +528,10 @@ class Player(Creature):
         SetFindDistance(distance)
         FindType(-1, 0)
         found = GetFindedList()
-        output = [Creature(i) for i in found if i]
+        output = [Creature.instantiate(i) for i in found if i]
         SetFindDistance(previous_distance)
         if creature_types:
-            output = [i for i in output if i.type_ in creature_types]
+            output = [i for i in output if i.type_id in creature_types]
         if notorieties:
             output = [i for i in output if i.notoriety in notorieties]
         if path_distance:

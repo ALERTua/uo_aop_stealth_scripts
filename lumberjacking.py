@@ -3,14 +3,10 @@ from copy import copy
 
 import pendulum
 
-from entities.base_script import ScriptBase, alive_action
-from entities.container import Container
+from entities.base_script import ScriptBase, alive_action, condition, log, stealth
 from entities.item import Item
 from entities.mob import Mob
-from py_stealth import *
 from tools import constants, tools
-
-log = AddToSystemJournal
 
 debug = True
 LJ_SLOGS = True
@@ -27,7 +23,19 @@ LJ_CONTAINER_ID = 0x728F3B3B
 LJ_CONTAINER_COORDS = (2470, 182)
 WOOD_ENTRANCE = (2503, 167)
 WOOD_ZONE_Y = 188
-
+LJ_TRASH = [
+    *constants.ITEM_IDS_TRASH,
+    constants.TYPE_ID_ARMOR_LEATHER_BUSTIER,
+    constants.TYPE_ID_ARMOR_LEATHER_SKIRT,
+]
+LJ_LOOT = [
+    constants.TYPE_ID_LOGS,
+    constants.TYPE_ID_HIDE,
+    *constants.TYPE_IDS_LOOT,
+    # constants.TYPE_ID_BANDAGE,
+    # constants.TYPE_ID_HATCHET,
+]
+LJ_LOOT = [i for i in LJ_LOOT if i not in LJ_TRASH]
 
 LJ_SPOTS = [
     (0x0CD0, 2512, 207, 0),
@@ -109,9 +117,8 @@ class Lumberjack(ScriptBase):
     def got_hatchet(self):
         return self.hatchet not in (None, 0, -1)
 
-    def pick_up_items(self):
-        type_ids = constants.TYPE_IDS_LJ_LOOT
-        return self._pick_up_items(type_ids)
+    def pick_up_items(self, **kwargs):
+        return super().pick_up_items(LJ_LOOT)
 
     def move_to_tree(self):
         self.parse_commands()
@@ -126,16 +133,16 @@ class Lumberjack(ScriptBase):
 
     def move_to_unload(self):
         self.parse_commands()
-        dist_to_container = Dist(self.player.x, self.player.y, *LJ_CONTAINER_COORDS)
+        dist_to_container = stealth.Dist(self.player.x, self.player.y, *LJ_CONTAINER_COORDS)
         if dist_to_container > 1:
             log("Moving to unload")
             if self.in_woods:
                 self.go_woods()
             self.wait_stamina()
             self.player.move(*LJ_CONTAINER_COORDS, accuracy=0)
-            tools.ping_delay()
-            log("Moving to unload done")
+        tools.ping_delay()
         self.player.use_object(LJ_CONTAINER_ID)
+        log("Moving to unload done")
 
     @alive_action
     def check_hatchet(self):
@@ -149,7 +156,7 @@ class Lumberjack(ScriptBase):
         self.move_to_unload()
         container_hatchet = self.player.find_type(constants.TYPE_ID_HATCHET, LJ_CONTAINER_ID)
         if not container_hatchet:
-            todo = GetFindedList()
+            todo = stealth.GetFindedList()
             log("WARNING! NO SPARE HATCHETS FOUND!")
             tools.telegram_message(f"{self.player}: No hatchets found: {todo}")
             self.quit()
@@ -164,19 +171,18 @@ class Lumberjack(ScriptBase):
     def check_bandages(self):
         return self._check_bandages(HOLD_BANDAGES, LJ_CONTAINER_ID)
 
-    def eat(self):
-        return self._eat(LJ_CONTAINER_ID)
+    def eat(self, **kwargs):
+        return super().eat(container_id=LJ_CONTAINER_ID)
 
     def count_logs(self, recursive=True):
         logs_type_ids = (constants.TYPE_ID_LOGS,)
-        logs_colors = constants.COLOR_LOGS
-        logs = self.player.find_types_backpack(type_ids=logs_type_ids, colors=logs_colors, recursive=recursive)
+        logs = self.player.find_types_backpack(type_ids=logs_type_ids, colors=constants.COLOR_LOGS, recursive=recursive)
         if not logs:
             return
 
         for logs_id in logs:
-            log_obj = Item(logs_id)
-            log_type = log_obj.type_
+            log_obj = Item.instantiate(logs_id)
+            log_type = log_obj.type_id
             log_color = log_obj.color
             log_quantity = log_obj.quantity
             if self.script_stats.get(log_type, None) is None:
@@ -189,14 +195,9 @@ class Lumberjack(ScriptBase):
         log("Unloading")
         self.move_to_unload()
         self.move_to_unload()
-        unload_types = [
-            constants.TYPE_ID_LOGS,
-            *constants.TYPE_IDS_LOOT,
-            *constants.TYPE_IDS_LJ_LOOT
-        ]
         self.count_logs()
         self.parse_commands()
-        self.player.unload_types(unload_types, LJ_CONTAINER_ID)
+        self.player.unload_types(LJ_LOOT, LJ_CONTAINER_ID)
         self.check_hatchet()
         self.check_bandages()
         self.rearm_from_container()
@@ -208,9 +209,9 @@ class Lumberjack(ScriptBase):
 
     def _jack_tree(self, tile_type, x, y, z):
         self.parse_commands()
-        CancelWaitTarget()
+        stealth.CancelWaitTarget()
         self.player.use_object(self.hatchet)
-        WaitTargetTile(tile_type, x, y, z)
+        stealth.WaitTargetTile(tile_type, x, y, z)
 
     @property
     def got_logs(self):
@@ -231,10 +232,10 @@ class Lumberjack(ScriptBase):
         while self.player.overweight:
             self.general_weight_check()
         self.move_to_tree()
-        ClearJournal()
+        stealth.ClearJournal()
         self._jack_tree(*self.current_tree)
 
-    def check_overweight(self, drop_types=None):
+    def check_overweight(self, **kwargs):
         drop_types = [
             (constants.TYPE_ID_LOGS, constants.COLOR_LOGS_S, constants.WEIGHT_LOGS),
             (constants.TYPE_ID_LOGS, -1, constants.WEIGHT_LOGS),
@@ -267,7 +268,7 @@ class Lumberjack(ScriptBase):
 
     def engage_mob(self, mob: Mob, **kwargs):
         return super().engage_mob(mob=mob, check_health_func=self.lj_check_health, loot=LOOT_CORPSES, cut=CUT_CORPSES,
-                                  drop_trash_items=True)
+                                  drop_trash_items=True, trash_items=LJ_TRASH)
 
     def lumberjack_process(self):
         self.jack_tree()
@@ -305,24 +306,21 @@ class Lumberjack(ScriptBase):
                 self.jack_tree()
                 i = 0
 
-            Wait(constants.USE_COOLDOWN)
+            stealth.Wait(constants.USE_COOLDOWN)
 
-    def loot_corpses(self):
-        if not LOOT_CORPSES:
-            return
+    @condition(LOOT_CORPSES)
+    def loot_corpses(self, **kwargs):
+        return super().loot_corpses(drop_trash_items=True, trash_items=LJ_TRASH)
 
-        return super().loot_corpses()
+    def drop_trash(self, **kwargs):
+        return super(Lumberjack, self).drop_trash(trash_items=LJ_TRASH)
 
+    @condition(EQUIP_WEAPONS_FROM_GROUND)
     def check_weapon(self, **kwargs):
-        if not EQUIP_WEAPONS_FROM_GROUND:
-            return
-
         return super().check_weapon(max_weapon_search_distance=MAX_WEAPON_SEARCH_DISTANCE)
 
+    @condition(EQUIP_WEAPONS_FROM_LOOT_CONTAINER)
     def rearm_from_container(self, **kwargs):
-        if not EQUIP_WEAPONS_FROM_LOOT_CONTAINER:
-            return
-
         return super().rearm_from_container(container_id=LJ_CONTAINER_ID)
 
     def start(self):

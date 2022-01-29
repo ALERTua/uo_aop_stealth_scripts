@@ -5,8 +5,11 @@ log = AddToSystemJournal
 
 
 class Item(Object):
-    def __init__(self, _id):
-        super().__init__(_id)
+    def __init__(self, _id, **kwargs):
+        super().__init__(_id, **kwargs)
+
+    def __str__(self):
+        return f"{self.quantity} x [{self.__class__.__name__}]({self._id}){self.name}"
 
     @property
     def name(self):
