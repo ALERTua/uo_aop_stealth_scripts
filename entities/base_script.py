@@ -115,9 +115,7 @@ class ScriptBase:
     def pick_up_items(self, type_ids):
         found_items = self.player.find_types_ground(type_ids, distance=constants.MAX_PICK_UP_DISTANCE)
         for item in found_items:
-            while item.exists and not self.player.grab(item):
-                log(f"Looting {item}")
-                tools.result_delay()
+            self.player.grab(item)
 
     @alive_action
     def engage_mob(self, mob: Mob, check_health_func=None, loot=True, cut=True, drop_trash_items=True,
@@ -190,23 +188,18 @@ class ScriptBase:
                 if not drop_object_id:
                     break
 
-                drop_object_name = stealth.GetName(drop_object_id)
-                drop_object_quantity = stealth.GetQuantity(drop_object_id)
-                if not drop_object_quantity:
+                drop_item = Item.instantiate(drop_object_id, color=drop_color, weight=drop_weight)
+                if not drop_item.quantity:
                     break
 
-                drop_quantity = min((weight_drop_needed // drop_weight) + 1, drop_object_quantity)
+                drop_quantity = min((weight_drop_needed // drop_item.weight_one) + 1, drop_item.quantity)
                 if not drop_quantity:
-                    log(f"won't drop {drop_quantity} of {drop_object_name} {drop_object_id}")
+                    log(f"won't drop {drop_quantity} of {drop_item.name} {drop_object_id}")
                     break
 
-                log(f"Need to relieve of {weight_drop_needed}st. Dropping {drop_quantity}x{drop_weight}st "
-                    f"of {drop_object_name}{drop_object_id}")
-                drop_result = self.player.drop_item(drop_object_id, drop_quantity)
-                tools.result_delay()
-                new_item_id = self.player.find_type_backpack(drop_type, drop_color)
-                if drop_result or (new_item_id != drop_object_id
-                                   or drop_object_quantity != stealth.GetQuantity(new_item_id)):
+                log(f"Need to relieve of {weight_drop_needed}st. Dropping {drop_quantity}×{drop_item}")
+                drop_result = self.player.drop_item(drop_item, drop_quantity)
+                if drop_result:
                     log(f"Drop successful")
                     break
 

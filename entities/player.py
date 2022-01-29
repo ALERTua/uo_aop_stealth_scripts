@@ -1,5 +1,6 @@
 from collections import namedtuple
 from collections.abc import Iterable
+from copy import copy
 from functools import wraps
 from typing import List
 
@@ -171,11 +172,12 @@ class Player(Creature):
     def open_backpack(self):
         return self.use_object(self.backpack)
 
-    def _open_container(self, id_):
-        self.use_object(id_)
+    def _open_container(self, container):
+        container = Container.instantiate(container)
+        self.use_object(container)
         for _ in range(1):  # double check result
             tools.result_delay()
-            if LastContainer() == id_:
+            if LastContainer() == container.id_:
                 return True
 
         return False
@@ -186,7 +188,7 @@ class Player(Creature):
             return
 
         i = 0
-        while not self._open_container(container.id_):
+        while not self._open_container(container):
             i += 1
             if i >= max_tries:
                 log(f"Couldn't open {container} after {max_tries} tries")
@@ -216,60 +218,90 @@ class Player(Creature):
 
     @alive_action
     @drag_cd
-    def move_item(self, item_id, quantity=-1, target_id=None, x=0, y=0, z=0):
+    def move_item(self, item_id, quantity=-1, target_id=None, x=0, y=0, z=0, max_tries=10, allow_same_container=False):
         # ItemID, Count, MoveIntoID, X, Y, Z
-        target_id = target_id or self.backpack.id_
-        target_id = getattr(target_id, 'id_', target_id)
-        item_id = getattr(item_id, 'id_', item_id)
-        if not IsObjectExists(item_id):
-            log(f"Won't move nonexistent {item_id}")
-            return
-
-        # if not IsMovable(item_id):
-        #     log(f"Cannot move {item_id}. Unmovable")
-        #     return
-
-        log(f"Moving {quantity} of {item_id} to {target_id} {x} {y} {z}")
-        return MoveItem(item_id, quantity, target_id, x, y, z)
-
-    @alive_action
-    @drag_cd
-    def grab(self, item_id, quantity=-1):
         item = Item.instantiate(item_id)
         if not item.exists:
+            log(f"Cannot move nonexistent {item}")
             return
 
-        quantity_str = 'all' if quantity == -1 else quantity
-        log(f"Looting {quantity_str} of {item_id}.")
-        return Grab(item.id_, quantity)
+        container = Container.instantiate(target_id) if target_id else self.backpack
+        if not container.exists:
+            log(f"Cannot move {item} to nonexistent {container}")
+            return
+
+        if not container.is_container:
+            log(f"Cannot move {item} to non-container {container}")
+            return
+
+        item_container = copy(item.parent)
+        if not allow_same_container and item_container == container:
+            log(f"Not allowed to move {item} within the same {item_container}")
+            return
+
+        i = 0
+        log(f"Moving {quantity}×{item} to {target_id}.")
+        while not (move_result := MoveItem(item.id_, quantity, container.id_, x, y, z)) \
+                and item.parent == item_container and (i := i + 1) < max_tries:
+            log(f".")
+        log(f"done. Moving success: {move_result}")
+        return move_result
 
     @alive_action
     @drag_cd
-    def drop_item(self, item_id, quantity=-1):
-        item_id = getattr(item_id, 'id_', item_id)
+    def grab(self, item_id, quantity=-1, max_tries=10):
+        item = Item.instantiate(item_id)
+        item_container = copy(item.parent)
         if quantity == 0:
-            log(f"cannot drop quantity {quantity} of {item_id}")
+            log(f"Cannot grab quantity {quantity} of {item}")
             return
 
-        if not IsObjectExists(item_id):
-            log(f"cannot drop {quantity} of nonexisting {item_id}")
+        if not item.exists:
+            log(f"Cannot grab {quantity} of nonexisting {item}")
             return
 
-        x, y, z, _ = self.coords
-        log(f"Dropping {quantity} of {item_id}")
-        return Drop(item_id, quantity, x, y, z)
+        i = 0
+        log(f"Grabbing {quantity}×{item}.")
+        while not (grab_result := Grab(item.id_, quantity)) and item.parent == item_container \
+                and (i := i + 1) < max_tries:
+            log(f".")
+        log(f"done. Grabbing success: {grab_result}")
+        return grab_result
+
+    @alive_action
+    @drag_cd
+    def drop_item(self, item_id, quantity=-1, max_tries=10):
+        item = Item.instantiate(item_id)
+        item_container = copy(item.parent)
+        if quantity == 0:
+            log(f"Cannot drop quantity {quantity} of {item}")
+            return
+
+        if not item.exists:
+            log(f"Cannot drop {quantity} of nonexisting {item}")
+            return
+
+        i = 0
+        log(f"Dropping {quantity}×{item}")
+        while not (drop_result := Drop(item.id_, quantity, 0, 0, 0)) and item.parent == item_container \
+                and (i := i + 1) < max_tries:
+            log(f".")
+        log(f"done. Dropping success: {drop_result}")
+        return drop_result
 
     @use_cd
-    def use_object(self, object_id):
-        object_id = getattr(object_id, 'id_', object_id)
-        if object_id in (0, None, -1):
+    def use_object(self, obj):
+        obj = Object.instantiate(obj)
+        if obj.id_ in (0, None, -1):
+            log(f"Cannot use {obj}")
             return
 
-        if not IsObjectExists(object_id):
+        if not obj.exists:
+            log(f"Cannot use nonexistent {obj}")
             return
 
-        log(f"Using {object_id}")
-        return UseObject(object_id)
+        log(f"Using {obj}")
+        return UseObject(obj.id_)
 
     @property
     def max_weight(self):
@@ -368,13 +400,20 @@ class Player(Creature):
         return self.find_type_backpack(object_type) or self.find_type_ground(object_type, distance)
 
     @alive_action
-    def smelt_ore(self, forge_id):
+    def smelt_ore(self, forge):
+        forge = Item.instantiate(forge)
         for ore_type in [constants.TYPE_ID_ORE, ]:
-            while ore := self.nearest_object_type(ore_type):
+            while ore := Item.instantiate(self.nearest_object_type(ore_type)):
+                if not ore.exists:
+                    break
+
+                if not ore.quantity:
+                    break
+
                 log(f"Smelting {ore}")
                 CancelWaitTarget()
                 self.use_object(ore)
-                WaitTargetObject(forge_id)
+                WaitTargetObject(forge.id_)
                 tools.ping_delay()
 
     @alive_action
@@ -408,51 +447,73 @@ class Player(Creature):
 
         return EmptyContainer(container.id_, destination.id_, delay)
 
-    def drop_trash_items(self, trash_item_ids=None, recursive=False):
+    def move_item_types(self, item_types, source_container=None, destination_container=None, max_quantity=0,
+                        items_color=None, x=0, y=0, z=0, delay=None):
+        if not isinstance(item_types, Iterable):
+            item_types = [item_types]
+        items_color = items_color or -1
+        source_container = Container.instantiate(source_container) if source_container else self.backpack
+        destination_container = destination_container or Ground()
+        destination_container = Container.instantiate(destination_container)
+        delay = delay or constants.DRAG_COOLDOWN
+        for item_type in item_types:
+            MoveItems(source_container.id_, item_type, items_color, destination_container.id_, x, y, z, delay,
+                      max_quantity)
+
+    def drop_item_types(self, item_types, **kwargs):
+        return self.move_item_types(item_types=item_types, **kwargs)
+
+    def drop_trash_items(self, trash_item_ids=None, **kwargs):
         trash_item_ids = trash_item_ids or constants.ITEM_IDS_TRASH
-        for item_id in trash_item_ids:
-            while item := self.find_type_backpack(item_id, recursive=recursive):
-                if item:
-                    self.drop_item(item)
+        return self.drop_item_types(trash_item_ids, **kwargs)
 
     def loot_nearest_corpse(self, corpse_id=None, range_=constants.USE_GROUND_RANGE, cut_corpse=True,
-                            drop_trash_items=True, trash_items=None):
+                            drop_trash_items=True, trash_items=None, hide_corpse=True):
         # todo: notoriety check
         range_ = range_ or constants.USE_GROUND_RANGE
         corpse_id = corpse_id or self.find_type_ground(constants.TYPE_ID_CORPSE, range_)
         if not corpse_id:
             return False
 
+        corpse = Container.instantiate(corpse_id)
         if cut_corpse:
-            corpse = Object.instantiate(corpse_id)
             self.move_to_object(corpse)
             self.cut_corpse(corpse_id)
-        self.loot_container(corpse_id)
+        self.loot_container(corpse)
         if drop_trash_items:
             self.drop_trash_items(trash_item_ids=trash_items)
+        if hide_corpse:
+            corpse.hide()
 
-    def cut_corpse(self, corpse_id):  # todo: notoriety check
-        containers = [RhandLayer(), LhandLayer(), self.backpack]
-        cut_tool_type_ids = constants.TYPE_IDS_CORPSE_CUT_TOOLS
-        cut_tool = None
-        break_ = False
-        for type_id in cut_tool_type_ids:
-            if break_:
-                break
+    def hide_object(self, obj):
+        obj = Object.instantiate(obj)
+        return obj.hide()
 
-            for container_id in containers:
-                cut_tool = self.find_type(type_id, container_id)
-                if cut_tool:
-                    break_ = True
-                    break
+    def find_types(self, types, container_ids=None, colors=None, recursive=True):
+        if not isinstance(types, Iterable):
+            types = [types]
+        colors = colors or [0xFFFF]
+        container_ids = container_ids or [0, RhandLayer(), LhandLayer(), self.backpack.id_]
+        FindTypesArrayEx(types, colors, container_ids, recursive)
+        output = [Object.instantiate(i) for i in GetFoundList()]
+        return output
 
-        if not cut_tool:
-            log(f'Cannot cut corpse {corpse_id}. No cutting tool.')
+    @property
+    def corpse_cutting_tool(self):
+        output = self.find_types(constants.TYPE_IDS_CORPSE_CUT_TOOLS)
+        if output:
+            return output[0]
+
+    def cut_corpse(self, corpse_or_id, cutting_tool=None):  # todo: notoriety check
+        corpse = Container.instantiate(corpse_or_id)  # todo: corpse entity
+        cutting_tool = self.corpse_cutting_tool
+        if not cutting_tool:
+            log(f"Cannot cut corpse {corpse_or_id}. No cutting tool.")
             return
 
         CancelWaitTarget()
-        WaitTargetObject(corpse_id)
-        self.use_object(cut_tool)
+        WaitTargetObject(corpse.id_)
+        self.use_object(cutting_tool)
 
     def path_to_coords(self, x, y, optimized=True, accuracy=0):
         return GetPathArray(x, y, optimized, accuracy)
