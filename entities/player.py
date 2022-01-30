@@ -1,3 +1,4 @@
+from datetime import datetime
 from collections import namedtuple
 from collections.abc import Iterable
 from copy import copy
@@ -41,9 +42,9 @@ def _cooldown(class_instance, cooldown_field, cooldown, func, *args, **kwargs):
     if time_left > 0:
         Wait(time_left)
 
-        output = func(class_instance, *args, **kwargs)
-        setattr(class_instance, cooldown_field, pendulum.now())
-        return output
+    output = func(class_instance, *args, **kwargs)
+    setattr(class_instance, cooldown_field, pendulum.now())
+    return output
 
 
 def skill_cd(func):
@@ -457,18 +458,23 @@ class Player(Creature):
         destination_container = Container.instantiate(destination_container)
         delay = delay or constants.DRAG_COOLDOWN
         for item_type in item_types:
+            log(f"Moving item type {item_type} from {source_container} to {destination_container}")
             MoveItems(source_container.id_, item_type, items_color, destination_container.id_, x, y, z, delay,
                       max_quantity)
 
+    @alive_action
     def drop_item_types(self, item_types, **kwargs):
         return self.move_item_types(item_types=item_types, **kwargs)
 
-    def drop_trash_items(self, trash_item_ids=None, **kwargs):
+    @alive_action
+    def drop_trash_items(self, trash_item_ids=None):
         trash_item_ids = trash_item_ids or constants.ITEM_IDS_TRASH
-        return self.drop_item_types(trash_item_ids, **kwargs)
+        trash_items = self.find_types_backpack(trash_item_ids)
+        for item in trash_items:
+            self.drop_item(item)
 
     def loot_nearest_corpse(self, corpse_id=None, range_=constants.USE_GROUND_RANGE, cut_corpse=True,
-                            drop_trash_items=True, trash_items=None, hide_corpse=True):
+                            drop_trash_items=True, trash_items=None, hide_corpse=True, skip_innocent=True):
         # todo: notoriety check
         range_ = range_ or constants.USE_GROUND_RANGE
         corpse_id = corpse_id or self.find_type_ground(constants.TYPE_ID_CORPSE, range_)
@@ -476,6 +482,10 @@ class Player(Creature):
             return False
 
         corpse = Container.instantiate(corpse_id)
+        if skip_innocent and corpse.innocent:
+            log(f"Skipping innocent corpse {corpse}")
+            return
+
         if cut_corpse:
             self.move_to_object(corpse)
             self.cut_corpse(corpse_id)

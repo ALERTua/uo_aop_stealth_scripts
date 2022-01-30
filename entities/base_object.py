@@ -1,7 +1,7 @@
 from tools import constants
-from py_stealth import *
+import py_stealth as stealth
 
-log = AddToSystemJournal
+log = stealth.AddToSystemJournal
 
 
 class Object:
@@ -47,13 +47,13 @@ class Object:
     @property
     def type_id(self):
         if self._type_id is None:
-            self._type_id = GetType(self._id)
+            self._type_id = stealth.GetType(self._id)
         return self._type_id
 
     @property
     def color(self):
         if self._color is None:
-            self._color = GetColor(self._id)
+            self._color = stealth.GetColor(self._id)
         return self._color
 
     @color.setter
@@ -62,17 +62,17 @@ class Object:
 
     @property
     def parent(self):
-        parent = GetParent(self.id_)
+        parent = stealth.GetParent(self.id_)
         if parent:
             from entities.container import Container  # avoid cyclic import
             return Container.instantiate(parent)
 
     @property
     def exists(self):
-        return IsObjectExists(self._id)
+        return stealth.IsObjectExists(self._id)
 
     def _get_name(self):
-        output = GetName(self._id)
+        output = stealth.GetName(self._id)
         return output or ''
 
     @property
@@ -86,21 +86,21 @@ class Object:
         if self.fixed_coords:
             return self._x
 
-        return GetX(self._id)
+        return stealth.GetX(self._id)
 
     @property
     def y(self):
         if self.fixed_coords:
             return self._y
 
-        return GetY(self._id)
+        return stealth.GetY(self._id)
 
     @property
     def z(self):
         if self.fixed_coords:
             return self._z
 
-        return GetZ(self._id)
+        return stealth.GetZ(self._id)
 
     @property
     def xy(self):
@@ -108,29 +108,29 @@ class Object:
 
     @property
     def coords(self):
-        return self.x, self.y, self.z, WorldNum()
+        return self.x, self.y, self.z, stealth.WorldNum()
 
     @property
     def _player_id(self):
-        return Self()
+        return stealth.Self()
 
     @property
     def player_x(self):
-        return GetX(self._player_id)
+        return stealth.GetX(self._player_id)
 
     @property
     def player_y(self):
-        return GetY(self._player_id)
+        return stealth.GetY(self._player_id)
 
     @property
     def distance(self):
         if self.coords == (0, 0, 0, 0):  # creature coords unknown
             return 99999
 
-        return Dist(self.player_x, self.player_y, self.x, self.y)
+        return stealth.Dist(self.player_x, self.player_y, self.x, self.y)
 
     def path(self, optimized=True, accuracy=0):
-        output = GetPathArray(self.x, self.y, optimized, accuracy)
+        output = stealth.GetPathArray(self.x, self.y, optimized, accuracy)
         return output
 
     def path_distance(self, optimized=True, accuracy=0):
@@ -164,7 +164,7 @@ class Object:
         Murderer = 0x06,
         Invulnerable = 0x07
         """
-        notoriety = GetNotoriety(self._id)
+        notoriety = stealth.GetNotoriety(self._id)
         output = constants.Notoriety(notoriety)
         return output
 
@@ -197,4 +197,4 @@ class Object:
         return self.notoriety == constants.Notoriety.Invulnerable
 
     def hide(self):
-        return  # ClientHide(self.id_)  # never gets the result and hangs forever
+        return stealth.ClientHide(self.id_)  # never gets the result and hangs forever

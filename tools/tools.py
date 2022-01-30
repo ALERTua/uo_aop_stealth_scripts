@@ -1,6 +1,8 @@
 import inspect
 import os
 import re
+from datetime import datetime
+from typing import List
 
 from py_stealth import *
 from tools import constants
@@ -86,6 +88,21 @@ def useobject_delay():
     return _delay(constants.USE_COOLDOWN)
 
 
+
+def journal(start_index=None, end_index=None):
+    start_index = LowJournal() if start_index is None else start_index
+    end_index = HighJournal() if end_index is None else end_index
+    line_numbers = range(start_index, end_index + 1)
+    output = []
+    for line_number in line_numbers:
+        output.append(constants.JournalLine(line_number))
+    return output
+
+
+def journal_lines_for_timedelta(self, start: datetime, end: datetime) -> List[constants.JournalLine]:
+    potential_end_index = InJournalBetweenTimes(' ', start, end)
+    end_index = None if potential_end_index in (-1, None) else potential_end_index + 1
+    return [line for line in self._journal(end_index=end_index) if start <= line.time <= end]
 def __main():
     telegram_message('test message')
 

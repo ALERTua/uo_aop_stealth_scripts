@@ -22,6 +22,34 @@ class Notoriety(Enum):
     Player = 65
 
 
+@unique
+class LineColor(Enum):
+    GREY = 946
+    INNOCENT = 90
+    RED = 38
+    SPEECH = 690
+    YELLOW = 55
+    WHITE = 1153
+
+
+class JournalLine:
+    def __init__(self, journal_id):
+        self.journal_id = journal_id
+        self.text = Journal(self.journal_id)
+        self.color = LineTextColor()
+        try:
+            self.color = LineColor(self.color)
+        except:
+            pass
+        self.author = LineName()
+        self.time = LineTime()
+        # self.msg_type = LineMsgType()
+        # self.count = LineCount()
+        # self.line_id = LineID()
+        # self.type = LineType()
+        # self.font = LineTextFont()
+
+
 # RANGES
 AGGRO_RANGE = 15
 ENGAGE_MAX_DISTANCE = 25

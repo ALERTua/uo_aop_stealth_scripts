@@ -7,6 +7,7 @@ import pendulum
 import pprint
 
 from tools import constants, tools
+from .container import Container
 from .item import Item
 from .mob import Mob
 from .player import Player, alive_action
@@ -147,12 +148,15 @@ class ScriptBase:
         if loot:
             self.player.loot_nearest_corpse(cut_corpse=cut, drop_trash_items=drop_trash_items)
 
+    @alive_action
     def drop_trash(self, trash_items=None):
         trash_items = trash_items or constants.ITEM_IDS_TRASH
         return self.player.drop_trash_items(trash_items)
 
+    @alive_action
     def loot_corpses(self, drop_trash_items=True, trash_items=None):
-        for corpse in self.player.find_types_ground(constants.TYPE_ID_CORPSE):
+        corpses = [Container.instantiate(i) for i in self.player.find_types_ground(constants.TYPE_ID_CORPSE)]
+        for corpse in corpses:
             if corpse in self._looted_corpses:
                 continue
 
@@ -161,6 +165,7 @@ class ScriptBase:
             self._looted_corpses.append(corpse)
         self.player.drop_trash_items(trash_item_ids=trash_items)
 
+    @alive_action
     def check_overweight(self, drop_types=None):
         if not self.player.overweight:  # consider near_max_weight
             return
@@ -207,6 +212,7 @@ class ScriptBase:
         if alarm:
             stealth.Alarm()
         log("Quitting")
+        tools.telegram_message(f"{self.player} quitting")
         self.at_exit()
         self.disconnect()
         exit()
@@ -378,4 +384,7 @@ class ScriptBase:
 
     @property
     def should_run(self):
+        if self.player.dead:
+            return True
+
         return self.player.near_max_weight is False and self.player.stamina > 10

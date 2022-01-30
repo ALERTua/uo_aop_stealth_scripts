@@ -1,7 +1,4 @@
-from py_stealth import *
-from .base_object import Object
-
-log = AddToSystemJournal
+from .base_object import Object, log, stealth
 
 
 class Item(Object):
@@ -17,13 +14,17 @@ class Item(Object):
         if self._name is None:
             self._name = self._get_name()
             if self._id != 0 and not self._name:  # clickonobject doesn't work on id 0
-                ClickOnObject(self._id)
+                stealth.ClickOnObject(self._id)
                 self._name = self._get_name()
         return self._name
 
+    @name.setter
+    def name(self, value):
+        self._name = value
+
     @property
     def quantity(self):
-        return GetQuantity(self._id)
+        return stealth.GetQuantity(self._id)
 
     @property
     def total_weight(self):
@@ -35,8 +36,8 @@ class Item(Object):
 
     @property
     def movable(self):  # Only returns value for the items on the ground. Otherwise always returns False
-        if self.parent == Ground():
-            return IsMovable(self.id_)
+        if self.parent == stealth.Ground():
+            return stealth.IsMovable(self.id_)
 
         return True
 
