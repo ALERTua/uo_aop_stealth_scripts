@@ -1,4 +1,3 @@
-from datetime import datetime
 from collections import namedtuple
 from collections.abc import Iterable
 from copy import copy
@@ -14,8 +13,7 @@ from tools import constants, tools
 from .base_creature import Creature
 from .base_weapon import WeaponBase
 from .container import Container
-
-log = AddToSystemJournal
+from tools.tools import log
 
 
 def alive_action(func):
@@ -186,17 +184,17 @@ class Player(Creature):
     def open_container(self, container, max_tries=10):
         container = Container.instantiate(container)
         if not container.exists or not container.is_container:
-            log(f"Cannot open non-container {container}")
+            log.info(f"Cannot open non-container {container}")
             return
 
         i = 0
         while not self._open_container(container):
             i += 1
             if i >= max_tries:
-                log(f"Couldn't open {container} after {max_tries} tries")
+                log.info(f"Couldn't open {container} after {max_tries} tries")
                 return False
 
-        log(f"Successfuly opened {container}")
+        log.info(f"Successfuly opened {container}")
         return True
 
     @alive_action
@@ -218,11 +216,15 @@ class Player(Creature):
         return self.move(obj.x, obj.y, optimized=optimized, accuracy=accuracy, running=running)
 
     def move(self, x, y, optimized=True, accuracy=1, running=True):
+        if self.overweight:
+            log.info(f"{self} Cannot move: overweight")
+            return
+
         if x <= 0 or y <= 0:
             return
 
         while self.paralyzed:
-            log(f"Waiting until unParalyzed")
+            log.info(f"Waiting until unParalyzed")
             tools.result_delay()
 
         # Xdst, Ydst, Optimized, Accuracy, Running
@@ -234,29 +236,29 @@ class Player(Creature):
         # ItemID, Count, MoveIntoID, X, Y, Z
         item = Item.instantiate(item_id)
         if not item.exists:
-            log(f"Cannot move nonexistent {item}")
+            log.info(f"Cannot move nonexistent {item}")
             return
 
         container = Container.instantiate(target_id) if target_id else self.backpack
         if not container.exists:
-            log(f"Cannot move {item} to nonexistent {container}")
+            log.info(f"Cannot move {item} to nonexistent {container}")
             return
 
         if not container.is_container:
-            log(f"Cannot move {item} to non-container {container}")
+            log.info(f"Cannot move {item} to non-container {container}")
             return
 
         item_container = copy(item.parent)
         if not allow_same_container and item_container == container:
-            log(f"Not allowed to move {item} within the same {item_container}")
+            log.info(f"Not allowed to move {item} within the same {item_container}")
             return
 
         i = 0
-        log(f"Moving {quantity}×{item} to {target_id}.")
+        log.info(f"Moving {quantity}×{item} to {container}.")
         while not (move_result := MoveItem(item.id_, quantity, container.id_, x, y, z)) \
                 and item.parent == item_container and (i := i + 1) < max_tries:
-            log(f".")
-        log(f"done. Moving success: {move_result}")
+            log.info(f".")
+        log.info(f"done. Moving success: {move_result}")
         return move_result
 
     @alive_action
@@ -265,19 +267,19 @@ class Player(Creature):
         item = Item.instantiate(item_id)
         item_container = copy(item.parent)
         if quantity == 0:
-            log(f"Cannot grab quantity {quantity} of {item}")
+            log.info(f"Cannot grab quantity {quantity} of {item}")
             return
 
         if not item.exists:
-            log(f"Cannot grab {quantity} of nonexisting {item}")
+            log.info(f"Cannot grab {quantity} of nonexisting {item}")
             return
 
         i = 0
-        log(f"Grabbing {quantity}×{item}.")
+        log.info(f"Grabbing {quantity}×{item}.")
         while not (grab_result := Grab(item.id_, quantity)) and item.parent == item_container \
                 and (i := i + 1) < max_tries:
-            log(f".")
-        log(f"done. Grabbing success: {grab_result}")
+            log.info(f".")
+        log.info(f"done. Grabbing success: {grab_result}")
         return grab_result
 
     @alive_action
@@ -286,38 +288,56 @@ class Player(Creature):
         item = Item.instantiate(item_id)
         item_container = copy(item.parent)
         if quantity == 0:
-            log(f"Cannot drop quantity {quantity} of {item}")
+            log.info(f"Cannot drop quantity {quantity} of {item}")
             return
 
         if not item.exists:
-            log(f"Cannot drop {quantity} of nonexisting {item}")
+            log.info(f"Cannot drop {quantity} of nonexisting {item}")
             return
 
         i = 0
-        log(f"Dropping {quantity}×{item}")
+        log.info(f"Dropping {quantity}×{item}")
         while not (drop_result := Drop(item.id_, quantity, 0, 0, 0)) and item.parent == item_container \
                 and (i := i + 1) < max_tries:
-            log(f".")
-        log(f"done. Dropping success: {drop_result}")
+            log.info(f".")
+        log.info(f"done. Dropping success: {drop_result}")
         return drop_result
 
     @use_cd
-    def use_object(self, obj):
+    def use_object(self, obj, announce=True):
         obj = Object.instantiate(obj)
         if obj.id_ in (0, None, -1):
-            log(f"Cannot use {obj}")
+            log.info(f"Cannot use {obj}")
             return
 
         if not obj.exists:
-            log(f"Cannot use nonexistent {obj}")
+            log.info(f"Cannot use nonexistent {obj}")
             return
 
-        log(f"Using {obj}")
+        if announce:
+            log.info(f"Using {obj}")
         return UseObject(obj.id_)
+
+    @alive_action
+    def use_object_on_object(self, obj, target):
+        obj = Object.instantiate(obj)
+        target = Object.instantiate(target)
+        log.info(f"Using {obj} on {target}")
+        CancelWaitTarget()
+        self.use_object(obj, announce=False)
+        WaitTargetObject(target.id_)
+
+    @alive_action
+    def use_object_on_tile(self, obj, tile_type, x, y, z):
+        obj = Object.instantiate(obj)
+        log.info(f"Using {obj} on tile {tile_type}:({x}, {y}, {z})")
+        CancelWaitTarget()
+        self.use_object(obj, announce=False)
+        WaitTargetTile(tile_type, x, y, z)
 
     @property
     def max_weight(self):
-        return Str() * 3 + 30 - 1
+        return Str() * 3 + 30
 
     @property
     def near_max_weight_value(self):
@@ -333,17 +353,17 @@ class Player(Creature):
 
     @property
     def overweight(self):
-        return self.weight >= self.max_weight
+        return self.weight > self.max_weight
 
     @alive_action
     def unload_types(self, item_types, container_id):
         for unload_type in item_types:
             got_type = FindType(unload_type)
             if got_type:
-                log(f"Moving {got_type}")
+                log.info(f"Moving {got_type}")
                 while got_type := FindType(unload_type):
                     self.move_item(got_type, GetQuantity(got_type), container_id, 0, 0, 0)
-                log(f"Moving {got_type} Done")
+                log.info(f"Moving {got_type} Done")
 
     def say(self, text):
         return UOSay(text)
@@ -352,7 +372,7 @@ class Player(Creature):
     @mining_cd
     def mine(self, direction):
         command = f"'pc mine {direction}"
-        log(f"Mining {direction}")
+        log.info(f"Mining {direction}")
         self.say(command)
 
     @alive_action
@@ -416,19 +436,25 @@ class Player(Creature):
     @alive_action
     def smelt_ore(self, forge):
         forge = Item.instantiate(forge)
+        if self.distance_to(*forge.xy) > constants.USE_GROUND_RANGE:
+            self.move(*forge.xy, accuracy=1)
         for ore_type in [constants.TYPE_ID_ORE, ]:
-            while ore := Item.instantiate(self.nearest_object_type(ore_type)):
+            while ore := Item.instantiate(self.nearest_object_type(ore_type)):  # todo: break possible infinite loop
                 if not ore.exists:
                     break
 
-                if not ore.quantity:
+                ore_quantity_before = copy(ore.quantity)
+                if not ore_quantity_before:
                     break
 
-                log(f"Smelting {ore}")
-                CancelWaitTarget()
-                self.use_object(ore)
-                WaitTargetObject(forge.id_)
+                log.info(f"Smelting {ore}")
+                self.use_object_on_object(ore, forge)
                 tools.ping_delay()
+                ore_quantity_after = copy(ore.quantity)
+                if (ore.exists and ore_quantity_after) and ore_quantity_before == ore_quantity_after:
+                    log.info(f"Smelt unsuccessful! {ore_quantity_before} x {ore}")
+                else:
+                    log.info(f"Smelt successful: {ore_quantity_before} x {ore}")
 
     @alive_action
     @bandage_cd
@@ -450,7 +476,7 @@ class Player(Creature):
                        use_container_before_looting=True):
         container = Container.instantiate(container_id)
         if not container.is_container:
-            log(f"Cannot loot container {container}. It is not a container.")
+            log.info(f"Cannot loot container {container}. It is not a container.")
             return False
 
         destination = Container.instantiate(destination_id) if destination_id else self.backpack
@@ -471,7 +497,7 @@ class Player(Creature):
         destination_container = Container.instantiate(destination_container)
         delay = delay or constants.DRAG_COOLDOWN
         for item_type in item_types:
-            log(f"Moving item type {item_type} from {source_container} to {destination_container}")
+            log.info(f"Moving item type {item_type} from {source_container} to {destination_container}")
             MoveItems(source_container.id_, item_type, items_color, destination_container.id_, x, y, z, delay,
                       max_quantity)
 
@@ -496,7 +522,7 @@ class Player(Creature):
 
         corpse = Container.instantiate(corpse_id)
         if skip_innocent and corpse.innocent:
-            log(f"Skipping innocent corpse {corpse}")
+            log.info(f"Skipping innocent corpse {corpse}")
             return
 
         if cut_corpse:
@@ -504,6 +530,7 @@ class Player(Creature):
             self.cut_corpse(corpse_id)
         self.loot_container(corpse)
         if drop_trash_items:
+            # noinspection PyArgumentList
             self.drop_trash_items(trash_item_ids=trash_items)
         if hide_corpse:
             corpse.hide()
@@ -529,14 +556,12 @@ class Player(Creature):
 
     def cut_corpse(self, corpse_or_id, cutting_tool=None):  # todo: notoriety check
         corpse = Container.instantiate(corpse_or_id)  # todo: corpse entity
-        cutting_tool = self.corpse_cutting_tool
+        cutting_tool = cutting_tool or self.corpse_cutting_tool
         if not cutting_tool:
-            log(f"Cannot cut corpse {corpse_or_id}. No cutting tool.")
+            log.info(f"Cannot cut corpse {corpse_or_id}. No cutting tool.")
             return
 
-        CancelWaitTarget()
-        WaitTargetObject(corpse.id_)
-        self.use_object(cutting_tool)
+        self.use_object_on_object(cutting_tool, corpse)
 
     def path_to_coords(self, x, y, optimized=True, accuracy=0):
         return GetPathArray(x, y, optimized, accuracy)
@@ -588,18 +613,6 @@ class Player(Creature):
 
     def distance_to(self, x, y):
         return Dist(self.x, self.y, x, y)
-
-    def find_red_creatures(self, distance=20, path_distance: bool = True, condition=None):
-        return self.find_creatures(distance=distance, path_distance=path_distance,
-                                   notorieties=[constants.Notoriety.Murderer], condition=condition)
-
-    def find_humans(self, distance=20, path_distance: bool = True, condition=None, notorieties=None):
-        return self.find_creatures(distance=distance, path_distance=path_distance, condition=condition,
-                                   creature_types=[constants.TYPE_ID_HUMAN], notorieties=notorieties)
-
-    def find_red_humans(self, distance=20, path_distance: bool = True, condition=None):
-        return self.find_humans(distance=distance, path_distance=path_distance,
-                                notorieties=[constants.Notoriety.Murderer], condition=condition)
 
     def find_creatures(self, distance: int = 20, path_distance: bool = True, creature_types: List[int] = None,
                        notorieties: List[int] or List[constants.Notoriety] = None,

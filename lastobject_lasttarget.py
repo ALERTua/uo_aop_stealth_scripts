@@ -1,7 +1,6 @@
-from entities.base_script import ScriptBase, log, stealth
+from entities.base_script import ScriptBase, stealth
 from tools import tools
-
-debug = False
+from tools.tools import log
 
 
 class LastObjectLastTarget(ScriptBase):
@@ -18,7 +17,5 @@ class LastObjectLastTarget(ScriptBase):
 
 
 if __name__ == '__main__':
-    if debug:
-        tools.debug()
     LastObjectLastTarget().start()
     print("")

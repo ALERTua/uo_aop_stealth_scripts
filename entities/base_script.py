@@ -13,8 +13,12 @@ from .item import Item
 from .mob import Mob
 from .player import Player, alive_action
 import py_stealth as stealth
+from tools.tools import log
 
-log = stealth.AddToSystemJournal
+
+BANK_COORDS = (2512, 556)
+HEALER_COORDS = constants.COORDS_MINOC_HEALER
+BANK_ID = 0x7277EC74
 
 
 def condition(condition_):
@@ -34,6 +38,7 @@ def condition(condition_):
 
 class ScriptBase:
     def __init__(self):
+        self.scenario_name = self.__class__.__name__
         self.player = Player()
         self._start_time = None
         self._processed_mobs = []
@@ -53,13 +58,13 @@ class ScriptBase:
             signal.signal(signal_, self.at_exit)
 
     def at_exit(self):
-        log(f"{self} atexit. Script stats:\n{self.script_stats_str}")
+        log.info(f"{self} atexit. Script stats:\n{self.script_stats_str}")
 
     def __str__(self):
         return self.name
 
     def stop(self):
-        log(f"Stopping {self}")
+        log.info(f"Stopping {self}")
         self.at_exit()
         stealth.StopAllScripts()
 
@@ -81,7 +86,14 @@ class ScriptBase:
 
     def report_stats(self):
         if self.script_stats:
-            return log(f"{self} stats:\n{self.script_stats_str}")
+            return log.info(f"{self} stats:\n{self.script_stats_str}")
+
+    # def callback_command_parser(self, **kwargs):  # todo: investigate inconsistent runs
+    #     self._event_timer_1 += 1  # evTimer1 executes every 100ms
+    #     if self._event_timer_1 >= 100:
+    #         self.parse_commands()
+    #         log.info(f"callback_command_parser: {kwargs}")
+    #         self._event_timer_1 = 0
 
     def parse_commands(self):
         if self._parse_command('quit'):
@@ -105,13 +117,13 @@ class ScriptBase:
     @alive_action
     def wait_stamina(self, threshold=20):
         if self.player.stamina < threshold:
-            log(f"Waiting stamina at least {threshold}")
+            log.info(f"Waiting stamina at least {threshold}")
         else:
             return
 
         while self.player.alive and self.player.stamina < threshold:
-            tools.ping_delay()
-        log(f"Stamina reached {threshold}")
+            tools.result_delay()
+        log.info(f"Stamina reached {threshold}")
 
     @alive_action
     def pick_up_items(self, type_ids):
@@ -124,19 +136,19 @@ class ScriptBase:
                    notify_only_mutated=True, trash_items=None):
         check_health_func = check_health_func or self.check_health
         if not mob.exists:
-            log(f"Won't engage nonexisting {mob}")
+            log.info(f"Won't engage nonexisting {mob}")
             return
 
         if mob.dead:
-            log(f"Won't engage dead {mob}")
+            log.info(f"Won't engage dead {mob}")
             return
 
         # distance = mob.path_distance()  # this is being checked before this function
         # if distance > 50:
-        #     log(f"Won't engage mob that {distance} this far away")
+        #     log.info(f"Won't engage mob that {distance} this far away")
         #     return
 
-        log(f"Engaging {mob} at distance {mob.distance}")
+        log.info(f"Engaging {mob} at distance {mob.distance}")
         if mob.mutated:
             stealth.Alarm()
         while mob.alive:
@@ -144,9 +156,9 @@ class ScriptBase:
                 self.player.move(mob.x, mob.y)
                 self.player.attack(mob.id_)
             else:
-                log(f"Won't engage {mob} that is already at distance {mob.distance}")
+                log.info(f"Won't engage {mob} that is already at distance {mob.distance}")
             check_health_func()  # script_check_health in scripts
-        log(f"Done Engaging {mob}")
+        log.info(f"Done Engaging {mob}")
         self.player.war_mode = False
         if not notify_only_mutated or (notify_only_mutated and mob.mutated):
             tools.telegram_message(f"{mob} dead", disable_notification=not mob.mutated)
@@ -205,19 +217,19 @@ class ScriptBase:
 
                 drop_quantity = min((weight_drop_needed // drop_item.weight_one) + 1, drop_item.quantity)
                 if not drop_quantity:
-                    log(f"won't drop {drop_quantity} of {drop_item.name} {drop_object_id}")
+                    log.info(f"won't drop {drop_quantity} of {drop_item.name} {drop_object_id}")
                     break
 
-                log(f"Need to relieve of {weight_drop_needed}st. Dropping {drop_quantity}×{drop_item}")
+                log.info(f"Need to relieve of {weight_drop_needed}st. Dropping {drop_quantity}×{drop_item}")
                 drop_result = self.player.drop_item(drop_item, drop_quantity)
                 if drop_result:
-                    log(f"Drop successful")
+                    log.info(f"Drop successful")
                     break
 
     def quit(self, alarm=True):
         if alarm:
             stealth.Alarm()
-        log("Quitting")
+        log.info("Quitting")
         tools.telegram_message(f"{self.player} quitting")
         self.at_exit()
         self.disconnect()
@@ -238,8 +250,62 @@ class ScriptBase:
     def script_running_time_words(self):
         return self.script_running_time.in_words()
 
-    @abstractmethod
     def resurrect(self):
+        log.info(f"Resurrecting and returning")
+        while self.player.dead:
+            log.info(f"Moving to healer {HEALER_COORDS}")
+            self.player.move(*HEALER_COORDS, accuracy=0)
+        reagent_types = [constants.TYPE_ID_REAGENT_MR, constants.TYPE_ID_REAGENT_BM, constants.TYPE_ID_REAGENT_BP]
+        while len(regs := self.player.find_types_backpack(reagent_types)) < 3 or self.player.xy == BANK_COORDS:
+            if self.player.xy != BANK_COORDS:
+                log.info(f"Moving to bank @ {BANK_COORDS}")
+                self.player.move(*BANK_COORDS, accuracy=0)
+            bank = Container.instantiate(BANK_ID)
+            if bank.is_empty:
+                log.info(f"Opening bank")
+                self.player.say('bank')
+                tools.result_delay()
+                self.player.hide()
+            if self.player.xy == BANK_COORDS:
+                log.info(f"Grabbing reagents {reagent_types}")
+                for reg_type in reagent_types:
+                    if self.player.got_item_type(reg_type):
+                        continue
+
+                    bank_item = self.player.find_type(reg_type, bank)
+                    if not bank_item:
+                        log.info(f"No reagent {reg_type} found @ bank")
+                        tools.telegram_message(f"Couldn't resurrect. No reagent {reg_type} found @ bank")
+                        self.disconnect()
+                        quit()
+                    grab_result = self.player.grab(bank_item, quantity=1)
+                    if not grab_result:
+                        log.info(f"Couldn't grab {reg_type}:{bank_item} from bank")
+                        tools.telegram_message(f"Couldn't resurrect. Couldn't grab {reg_type}:{bank_item} from bank")
+                        self.disconnect()
+                        quit()
+
+                rune = self.player.find_type(constants.TYPE_ID_RUNE, bank)
+                if rune:
+                    log.info(f"Casting Recall @ {rune}")
+                    stealth.CastToObject('recall', rune)
+                    stealth.Wait(5000)
+                    if self.player.xy != BANK_COORDS:
+                        break
+                else:
+                    log.info(f"No rune found @ bank")
+                    tools.telegram_message("Couldn't resurrect. No rune found @ bank")
+                    self.disconnect()
+                    quit()
+        self.move_to_unload()
+        self.unload()
+
+    @abstractmethod
+    def move_to_unload(self):
+        raise NotImplemented()
+
+    @abstractmethod
+    def unload(self):
         raise NotImplemented()
 
     def check_health(self, resurrect=False):
@@ -268,41 +334,41 @@ class ScriptBase:
 
     @alive_action
     def _check_bandages(self, quantity, container_id):
-        log("Checking Bandages")
+        log.info("Checking Bandages")
+        container = Container.instantiate(container_id)
         player_bandages = self.player.got_bandages
         if not player_bandages or stealth.GetQuantity(player_bandages) < quantity:
-            bandages = stealth.FindType(constants.TYPE_ID_BANDAGE, container_id)
+            bandages = self.player.find_type(constants.TYPE_ID_BANDAGE, container)
             if not bandages:
-                log("WARNING! NO SPARE BANDAGES FOUND!")
+                log.info("WARNING! NO SPARE BANDAGES FOUND!")
                 tools.telegram_message(f"{self.player}: No bandages found. "
                                        f"Script ran for {self.script_running_time_words}")
                 self.quit()
                 return
 
             while not self.got_bandages(quantity) and not self.player.move_item(bandages, quantity):
-                log("Grabbing Bandages")
+                log.info("Grabbing Bandages")
                 tools.ping_delay()
 
     @alive_action
     def eat(self, container_id, food_type=None):
         food_type = food_type or constants.TYPE_ID_FOOD_FISHSTEAKS
-        log("Eating")
-        food = stealth.FindType(food_type, container_id)
+        self.player.open_container(container_id)
+        log.info("Eating")
+        food = self.player.find_type(food_type, container_id)
         if not food:
-            self.player.open_container(container_id)
-            food = stealth.FindType(food_type, container_id)
-            if not food:
-                log("WARNING! NO FOOD FOUND!")
-                tools.telegram_message(f"{self.player}: No food found", disable_notification=True)
-                return
+            log.info("WARNING! NO FOOD FOUND!")
+            tools.telegram_message(f"{self.player}: No food found", disable_notification=True)
+            return
 
         self.player.use_object(food)
 
     @alive_action
-    def process_mobs(self, engage=True, notify_only_mutated=True, mob_find_distance=20):
+    def process_mobs(self, engage=True, notify_only_mutated=True, mob_find_distance=20, drop_overweight_items=None):
         output = False
-        while creatures := self.player.find_red_creatures(
-                distance=mob_find_distance, condition=lambda i: i not in self._processed_mobs):
+        while creatures := self.player.find_creatures(
+                distance=mob_find_distance, notorieties=[constants.Notoriety.Murderer],
+                condition=lambda i: i not in self._processed_mobs and i.exists and not i.mount and not i.human):
             for creature in creatures:
                 if creature in self._processed_mobs:
                     continue
@@ -316,10 +382,11 @@ class ScriptBase:
                     # noinspection PyProtectedMember
                     mob_distance = mob._path_distance  # we already got this
                     max_distance = constants.ENGAGE_MAX_DISTANCE
-                    if mob_distance > max_distance:
-                        log(f"Won't engage {mob}. Distance path: {mob_distance} > {max_distance}")
+                    if mob_distance > max_distance or mob_distance <= 1:
+                        log.info(f"Won't engage {mob}. Distance path: {mob_distance}, max distance: {max_distance}")
                     else:
-                        self.drop_overweight_items()
+                        if drop_overweight_items:
+                            self.drop_overweight_items(drop_overweight_items)
                         self.engage_mob(mob)
                         output = True
                 self._processed_mobs.append(creature)
@@ -330,19 +397,20 @@ class ScriptBase:
         if self.player.weapon_equipped:
             return
 
-        log(f"Rearming from container {container_id}")
+        container = Container.instantiate(container_id)
+        log.info(f"Rearming from {container}")
         weapon_type_ids = weapon_type_ids or constants.TYPE_IDS_WEAPONS
         if not weapon_type_ids:
             return
 
-        if not container_id:
+        if not container.exists or not container.is_container:
             return
 
         for weapon_type_id in weapon_type_ids:
             if self.player.weapon_equipped:
                 break
 
-            found_weapon = self.player.find_type(weapon_type_id, container_id)
+            found_weapon = self.player.find_type(weapon_type_id, container)
             if not found_weapon:
                 continue
 
@@ -354,11 +422,11 @@ class ScriptBase:
         if self.player.weapon_equipped:
             return False
 
-        log(f"Checking weapons on ground")
+        log.info(f"Checking weapons on ground")
         weapon_types = copy(constants.TYPE_IDS_WEAPONS)
         while not self.player.weapon_equipped:
             if not weapon_types:
-                log(f"No weapons found on ground")
+                log.info(f"No weapons found on ground")
                 return
 
             for weapon_type in weapon_types:
@@ -389,7 +457,7 @@ class ScriptBase:
                 weapon_types.remove(weapon_type)
                 return True
 
-        log(f"Done checking weapons on ground")
+        log.info(f"Done checking weapons on ground")
 
     @staticmethod
     def mob_type_ids(ranged=False, melee=False, critter=False, aggressive=False):

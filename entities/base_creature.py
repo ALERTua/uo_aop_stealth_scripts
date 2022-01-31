@@ -1,7 +1,8 @@
 from .base_object import Object
+from tools import constants
 from py_stealth import *
 
-log = AddToSystemJournal
+from tools.tools import log
 
 
 class Creature(Object):
@@ -55,3 +56,11 @@ class Creature(Object):
     @property
     def dead(self):
         return self.hp <= 0
+
+    @property
+    def human(self):
+        return self.type_id in constants.TYPE_IDS_HUMAN
+
+    @property
+    def mount(self):
+        return self.type_id in constants.TYPE_IDS_MOUNT

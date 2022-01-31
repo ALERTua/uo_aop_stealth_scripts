@@ -1,10 +1,12 @@
 from abc import ABCMeta, abstractmethod
+from entities.item import Item
+import py_stealth as stealth
 
-from py_stealth import *
-
-
-class WeaponBase:
+class WeaponBase(Item):
     __metaclass__ = ABCMeta
+
+    def __str__(self):
+        return f"[{self.__class__.__name__}]({hex(self._id)}){self.name}"
 
     @property
     @abstractmethod
@@ -19,7 +21,7 @@ class WeaponBase:
 
 class LeftHandWeapon(WeaponBase):
     def layer(self):
-        return LhandLayer()
+        return stealth.LhandLayer()
 
     @property
     @abstractmethod
@@ -29,7 +31,7 @@ class LeftHandWeapon(WeaponBase):
 
 class RightHandWeapon(WeaponBase):
     def layer(self):
-        return RhandLayer()
+        return stealth.RhandLayer()
 
     @property
     @abstractmethod

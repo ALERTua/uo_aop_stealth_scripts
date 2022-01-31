@@ -4,10 +4,10 @@ import re
 from datetime import datetime
 from typing import List
 
-from py_stealth import *
+import py_stealth as stealth
 from tools import constants
-
-log = AddToSystemJournal
+from global_logger import Log
+log = Log.get_logger(use_colors=False)
 
 
 def debug():
@@ -27,6 +27,12 @@ def debug():
         print("Error connecting to PyCharm Debugger @ %s:%s : %s %s" % (ip, port, type(e), e))
     else:
         print("Connected to PyCharm Debugger @ %s:%s" % (ip, port))
+    log.verbose = True
+
+
+DEBUG = True
+if DEBUG:
+    debug()
 
 
 def get_prev_function_name():
@@ -36,9 +42,16 @@ def get_prev_function_name():
     return output
 
 
-def in_journal(text, regexp=False, return_re_value=False):
+def in_journal(text, regexp=False, return_re_value=False, limit_last=50):
     """Returns whether the supplied text is ANYWHERE in the journal"""
-    for line in [Journal(i) for i in range(0, HighJournal() + 1)]:
+    high_journal = stealth.HighJournal()
+    low_journal = stealth.LowJournal()
+    if limit_last:
+        low_journal = high_journal - limit_last
+    range_ = range(low_journal, high_journal + 1)
+    if len(range_) > 55:
+        log.info(f"Parsing too long journal: {low_journal} to {high_journal} range {range_} for text: {text}")
+    for line in [stealth.Journal(i) for i in range_]:
         if regexp:
             if re.search(text, line, re.IGNORECASE | re.MULTILINE):
                 if return_re_value:
@@ -73,7 +86,7 @@ def telegram_message(msg, chat_id=None, disable_notification=False, token=None):
 
 
 def _delay(delay=250):
-    return Wait(delay)
+    return stealth.Wait(delay)
 
 
 def ping_delay():
@@ -88,10 +101,13 @@ def useobject_delay():
     return _delay(constants.USE_COOLDOWN)
 
 
+def string_in_strings(str_, strings):
+    return any(i for i in strings if str_.lower() in i.lower())
+
 
 def journal(start_index=None, end_index=None):
-    start_index = LowJournal() if start_index is None else start_index
-    end_index = HighJournal() if end_index is None else end_index
+    start_index = stealth.LowJournal() if start_index is None else start_index
+    end_index = stealth.HighJournal() if end_index is None else end_index
     line_numbers = range(start_index, end_index + 1)
     output = []
     for line_number in line_numbers:
@@ -100,9 +116,11 @@ def journal(start_index=None, end_index=None):
 
 
 def journal_lines_for_timedelta(self, start: datetime, end: datetime) -> List[constants.JournalLine]:
-    potential_end_index = InJournalBetweenTimes(' ', start, end)
+    potential_end_index = stealth.InJournalBetweenTimes(' ', start, end)
     end_index = None if potential_end_index in (-1, None) else potential_end_index + 1
     return [line for line in self._journal(end_index=end_index) if start <= line.time <= end]
+
+
 def __main():
     telegram_message('test message')
 

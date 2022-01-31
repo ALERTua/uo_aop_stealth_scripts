@@ -1,8 +1,7 @@
 from .base_creature import Creature
 from tools import constants
-from py_stealth import *
+from tools.tools import log
 
-log = AddToSystemJournal
 
 
 class Mob(Creature):

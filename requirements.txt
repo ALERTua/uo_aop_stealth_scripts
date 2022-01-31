@@ -1,1 +1,2 @@
 pendulum
+global-logger

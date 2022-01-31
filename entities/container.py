@@ -1,5 +1,6 @@
-from entities.item import Item, log, stealth
+from entities.item import Item, stealth
 from tools import tools, constants
+from tools.tools import log
 
 
 class Container(Item):

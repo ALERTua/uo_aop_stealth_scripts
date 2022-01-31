@@ -3,12 +3,7 @@ from entities.item import Item
 from entities.player import Player
 from tools import tools
 from py_stealth import *
-
-log = AddToSystemJournal
-
-debug = True
-if debug:
-    tools.debug()
+from tools.tools import log
 
 player = Player()
 

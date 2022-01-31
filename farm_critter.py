@@ -5,9 +5,10 @@ import pendulum
 from entities.item import Item
 from entities.mob import Mob
 from tools import tools, constants
-from entities.base_script import ScriptBase, log, stealth
+from tools.tools import log
+from entities.base_script import ScriptBase, stealth
 
-debug = True
+
 ROAM_COORDS = [
     (2475, 218),
     (2563, 263),
@@ -47,7 +48,7 @@ class FarmCritter(ScriptBase):
             closest_spot = self.player.get_closest_coords(self._spots)
             spot_index = self._spots.index(closest_spot)
             self._current_spot = self._spots.pop(spot_index)
-            log(f"New Closest Spot: {self._current_spot}. Spots left: {len(self._spots)}/{len(self.roam_spots)}")
+            log.info(f"New Closest Spot: {self._current_spot}. Spots left: {len(self._spots)}/{len(self.roam_spots)}")
         return self._current_spot
 
     @current_spot.setter
@@ -55,18 +56,18 @@ class FarmCritter(ScriptBase):
         self._current_spot = value
 
     def spot_depleeted(self):
-        log(f"{self.current_spot} Depleeted.")
+        log.info(f"{self.current_spot} Depleeted.")
         self.current_spot = None
 
     def move_to_unload(self):
         self.parse_commands()
         dist_to_container = stealth.Dist(self.player.x, self.player.y, *LOOT_CONTAINER_COORDS)
         if dist_to_container > 1:
-            log("Moving to unload")
+            log.info("Moving to unload")
             self.wait_stamina()
             self.player.move(*LOOT_CONTAINER_COORDS, accuracy=0)
             tools.ping_delay()
-            log("Moving to unload done")
+            log.info("Moving to unload done")
         self.player.use_object(LOOT_CONTAINER_ID)
 
     def check_bandages(self):
@@ -76,7 +77,7 @@ class FarmCritter(ScriptBase):
         return super().eat(container_id=LOOT_CONTAINER_ID)
 
     def unload(self):
-        log("Unloading")
+        log.info("Unloading")
         self.move_to_unload()
         self.move_to_unload()
         unload_types = [
@@ -146,14 +147,14 @@ class FarmCritter(ScriptBase):
             container_weapon_ids.extend(found_weapons)
 
         if not container_weapon_ids:
-            log("WARNING! NO SPARE WEAPONS FOUND!")
+            log.info("WARNING! NO SPARE WEAPONS FOUND!")
             tools.telegram_message(f"{self.player}: No weapons found")
             self.quit()
             return
 
         weapon_obj = Item.instantiate(container_weapon_ids[0])
         while not self.player.weapon_equipped:
-            log(f"Equipping weapon {weapon_obj}")
+            log.info(f"Equipping weapon {weapon_obj}")
             self.player.equip_weapon_id(weapon_obj)
             tools.ping_delay()
 
@@ -179,7 +180,5 @@ class FarmCritter(ScriptBase):
 
 
 if __name__ == '__main__':
-    if debug:
-        tools.debug()
     FarmCritter().start()
     print("")

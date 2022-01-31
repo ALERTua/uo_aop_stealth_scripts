@@ -1,5 +1,4 @@
 # SCROLLS
-
 TYPE_ID_SCROLLS = [
     0x1F51,
     0x1F42,

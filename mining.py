@@ -6,10 +6,9 @@ from entities.container import Container
 from entities.item import Item
 from entities.mob import Mob
 from tools import constants, tools
-from entities.base_script import ScriptBase, condition, log, stealth, alive_action
+from entities.base_script import ScriptBase, condition, stealth, alive_action
+from tools.tools import log
 
-
-debug = True
 MINE_IRON = True
 SMELT = True
 ENGAGE_MOBS = True
@@ -19,9 +18,6 @@ GET_FREE_PICKAXE = True
 EQUIP_WEAPONS_FROM_GROUND = True
 EQUIP_WEAPONS_FROM_LOOT_CONTAINER = True
 RESURRECT_AND_RETURN = True
-HEALER_COORDS = constants.COORDS_MINOC_HEALER
-BANK_COORDS = (2512, 556)
-BANK_ID = 0x7277EC74
 MAX_WEAPON_SEARCH_DISTANCE = 20
 MOB_FIND_DISTANCE = 25
 FREE_PICKAXE_CONTAINERS = {
@@ -124,7 +120,7 @@ class Miner(ScriptBase):
         self.parse_commands()
         dist_to_container = stealth.Dist(self.player.x, self.player.y, *MINING_CONTAINER_COORDS)
         if dist_to_container > 1:
-            log("Moving to unload")
+            log.info("Moving to unload")
             if self.in_mine:
                 self.go_to_mine_entrance()
             self.wait_stamina()
@@ -133,7 +129,7 @@ class Miner(ScriptBase):
         if self.loot_container.exists and self.player.last_container != self.loot_container \
                 and not self.player.open_container(self.loot_container):
             tools.telegram_message(f"Failed to open {self.loot_container}")
-        log("Moving to unload done")
+        log.info("Moving to unload done")
 
     @alive_action
     def eat(self, **kwargs):
@@ -161,7 +157,7 @@ class Miner(ScriptBase):
         if self.pickaxe:
             return True
         else:
-            log("Moving to grab a Pickaxe")
+            log.info("Moving to grab a Pickaxe")
             if self.in_mine:
                 self.get_free_pickaxe()
                 self.move_mining_spot()  # todo: consider this
@@ -171,11 +167,11 @@ class Miner(ScriptBase):
             self.move_to_unload()
             pickaxe = self.player.find_type(constants.TYPE_ID_TOOL_PICKAXE, MINING_CONTAINER_ID)
             if not pickaxe:
-                log("WARNING! NO SPARE PICKAXES FOUND!")
+                log.info("WARNING! NO SPARE PICKAXES FOUND!")
                 if not GET_FREE_PICKAXE:
                     self.quit()
 
-            log("Grabbing a Pickaxe")
+            log.info("Grabbing a Pickaxe")
             return self.player.grab(pickaxe)
 
     @alive_action
@@ -184,7 +180,7 @@ class Miner(ScriptBase):
 
     @alive_action
     def unload(self):
-        log("Unloading")
+        log.info("Unloading")
         self.move_to_unload()
         self.move_to_unload()
         self.player.unload_types(MINING_LOOT, MINING_CONTAINER_ID)
@@ -197,28 +193,27 @@ class Miner(ScriptBase):
         self.parse_commands()
         self.wait_stamina()
         self.check_overweight()
-        log(f"Going to the mine")
+        log.info(f"Going to the mine")
+        self.check_overweight()
         self.player.move(*MINE_ENTRANCE_COORDS)
-        log(f"Going to the mine done")
+        log.info(f"Going to the mine done")
         self.wait_stamina(5)
 
     @property
     def mining_spots(self):
         if not self._mining_spots:
-            log(f"Mining spots depleeted. Refreshing.")
+            log.info(f"Mining spots depleeted. Refreshing.")
             self._mining_spots = copy(MINING_SPOTS)
         return self._mining_spots
 
     def mining_spot_depleeted(self):
         old_mining_spot = copy(self._mining_spot)
         self._mining_spot = self.mining_spots.pop(0)
-        log(f"Mining spot {old_mining_spot} depleeted. New mining spot: {self._mining_spot}. "
+        log.info(f"Mining spot {old_mining_spot} depleeted. New mining spot: {self._mining_spot}. "
             f"Spots left: {len(self._mining_spots)}/{len(MINING_SPOTS)}")
 
     @property
     def mining_spot(self):
-        # if not self._mining_spot:
-        #     self.mining_spot_depleeted()
         return self._mining_spot
 
     @property
@@ -237,7 +232,7 @@ class Miner(ScriptBase):
     def direction_depleeted(self):
         old_direction = copy(self._direction)
         self._direction = self.directions.pop(0)
-        log(f"{len(self._mining_spots)}/{len(MINING_SPOTS)} {self._mining_spot} {old_direction} depleeted. "
+        log.info(f"{len(self._mining_spots)}/{len(MINING_SPOTS)} {self._mining_spot} {old_direction} depleeted. "
             f"Going: {len(self.directions)}/{len(DIRECTIONS)} {self._direction}.")
         stealth.ClearJournal()
 
@@ -254,55 +249,12 @@ class Miner(ScriptBase):
         return super().engage_mob(mob=mob, check_health_func=self.mine_check_health, loot=LOOT_CORPSES, cut=CUT_CORPSES,
                                   drop_trash_items=True, notify_only_mutated=True)
 
-    def resurrect(self):
-        log(f"Resurrecting and returning")
-        while self.player.dead:
-            log(f"Moving to healer {HEALER_COORDS}")
-            self.player.move(*HEALER_COORDS, accuracy=0)
-        reagent_types = [constants.TYPE_ID_REAGENT_MR, constants.TYPE_ID_REAGENT_BM, constants.TYPE_ID_REAGENT_BP]
-        while len(regs := self.player.find_types_backpack(reagent_types)) < 3 or self.player.xy == BANK_COORDS:
-            if self.player.xy != BANK_COORDS:
-                log(f"Moving to bank @ {BANK_COORDS}")
-                self.player.move(*BANK_COORDS, accuracy=0)
-            bank = Container.instantiate(BANK_ID)
-            if bank.is_empty:
-                log(f"Opening bank")
-                self.player.say('bank')
-                tools.result_delay()
-                self.player.hide()
-            if self.player.xy == BANK_COORDS:
-                log(f"Grabbing reagents {reagent_types}")
-                for reg_type in reagent_types:
-                    if self.player.got_item_type(reg_type):
-                        continue
+    def check_health(self, **kwargs):
+        return super().check_health(resurrect=RESURRECT_AND_RETURN)
 
-                    bank_item = self.player.find_type(reg_type, bank)
-                    if not bank_item:
-                        log(f"No reagent {reg_type} found @ bank")
-                        tools.telegram_message(f"Couldn't resurrect. No reagent {reg_type} found @ bank")
-                        self.disconnect()
-                        quit()
-                    grab_result = self.player.grab(bank_item, quantity=1)
-                    if not grab_result:
-                        log(f"Couldn't grab {reg_type}:{bank_item} from bank")
-                        tools.telegram_message(f"Couldn't resurrect. Couldn't grab {reg_type}:{bank_item} from bank")
-                        self.disconnect()
-                        quit()
-
-                rune = self.player.find_type(constants.TYPE_ID_RUNE, bank)
-                if rune:
-                    log(f"Casting Recall @ {rune}")
-                    stealth.CastToObject('recall', rune)
-                    stealth.Wait(5000)
-                    if self.player.xy != BANK_COORDS:
-                        break
-                else:
-                    log(f"No rune found @ bank")
-                    tools.telegram_message("Couldn't resurrect. No rune found @ bank")
-                    self.disconnect()
-                    quit()
-        self.move_to_unload()
-        self.unload()
+    def process_mobs(self, **kwargs):
+        return super().process_mobs(engage=ENGAGE_MOBS, notify_only_mutated=True, mob_find_distance=MOB_FIND_DISTANCE,
+                                    drop_overweight_items=self.drop_types)
 
     def mine_check_health(self):
         if self.check_health():
@@ -338,7 +290,7 @@ class Miner(ScriptBase):
         self._checks()
         _ = self.direction
         while self.player.xy != self.mining_spot:
-            # self.check_overweight()
+            log.info(f"Moving to the next mining spot: {self.mining_spot}")
             self.wait_stamina(5)
             self.player.move(*self.mining_spot, running=self.should_run, accuracy=0)
             self._checks()
@@ -348,6 +300,7 @@ class Miner(ScriptBase):
             self.parse_commands()
             self.drop_trash()
             self.general_weight_check()
+            self.check_overweight()
         if SMELT:  # consider near_max_weight
             while self.in_mine and self.player.overweight and self.move_mining_spot() is None and self.got_ore:
                 self.smelt()
@@ -361,10 +314,10 @@ class Miner(ScriptBase):
         self.mine_direction()
         self.mining_i = 0
         while True:
-            if tools.in_journal(r'skip \d+ spots', regexp=True):
-                spots_quantity = tools.in_journal(r'skip \d+ spots', regexp=True, return_re_value=True)
+            if tools.in_journal(r'skip \d+ spot[s]', regexp=True):
+                spots_quantity = tools.in_journal(r'skip \d+ spot[s]', regexp=True, return_re_value=True)
                 spots_quantity = int(re.findall(r'\d+', spots_quantity[0])[0])
-                log(f"Skipping {spots_quantity} spots")
+                log.info(f"Skipping {spots_quantity} spots")
                 for i in range(spots_quantity):
                     self.mining_spot_depleeted()
                 self._directions = []
@@ -372,7 +325,7 @@ class Miner(ScriptBase):
                 self.mine_direction()
                 continue
             elif tools.in_journal('skip spot'):
-                log(f"Skipping spot")
+                log.info(f"Skipping spot")
                 self._directions = []
                 self.mining_i = 0
                 self.mine_direction()
@@ -396,6 +349,8 @@ class Miner(ScriptBase):
                 self.mine_direction()
                 self.mining_i = 0
 
+            last_journal_message = stealth.LastJournalMessage()
+            log.info(f"{self.mining_i}/{MINE_MAX_ITERATIONS} Waiting for mining to complete: {last_journal_message}")
             stealth.Wait(constants.USE_COOLDOWN)
 
     @property
@@ -408,14 +363,14 @@ class Miner(ScriptBase):
 
         forge = self.nearest_forge
         if not forge.exists:
-            log(f"Cannot smelt. No forge found.")
+            log.info(f"Cannot smelt. No forge found.")
             return
 
         self.check_overweight()
         if not self.got_ore:
             return
 
-        log(f"Smelting Ore")
+        log.info(f"Smelting Ore")
         self.wait_stamina()
         self.player.move(*MINE_FORGE_COORDS, accuracy=1)
         self.player.smelt_ore(forge)
@@ -440,7 +395,7 @@ class Miner(ScriptBase):
         for container_id, container_coords in FREE_PICKAXE_CONTAINERS.items():
             x, y = container_coords
             container = Container.instantiate(container_id, x=x, y=y, fixed_coords=True)
-            log(f"Getting free pickaxe from {container}")
+            log.info(f"Getting free pickaxe from {container}")
             self.player.move_to_object(container, accuracy=1, running=self.should_run)
             self.player.loot_container(container)
 
@@ -470,6 +425,7 @@ class Miner(ScriptBase):
 
     def start(self):
         # stealth.SetEventProc('evtimer1', self.callback_command_parser)
+        log.info(f"Starting {self.scenario_name}")
         self._start_time = pendulum.now()
         dist_to_container = self.player.path_distance_to(*MINING_CONTAINER_COORDS)
         if dist_to_container < 20:
@@ -489,7 +445,5 @@ class Miner(ScriptBase):
 
 
 if __name__ == '__main__':
-    if debug:
-        tools.debug()
     Miner().start()
     print("")

@@ -1,7 +1,6 @@
 from tools import constants
 import py_stealth as stealth
-
-log = stealth.AddToSystemJournal
+from tools.tools import log
 
 
 class Object:
@@ -48,6 +47,8 @@ class Object:
     def type_id(self):
         if self._type_id is None:
             self._type_id = stealth.GetType(self._id)
+            if self._type_id == 0:
+                self._type_id = None
         return self._type_id
 
     @property
@@ -69,7 +70,7 @@ class Object:
 
     @property
     def exists(self):
-        return stealth.IsObjectExists(self._id)
+        return stealth.IsObjectExists(self._id) and self.type_id
 
     def _get_name(self):
         output = stealth.GetName(self._id)

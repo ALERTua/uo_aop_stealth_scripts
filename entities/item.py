@@ -1,4 +1,5 @@
-from .base_object import Object, log, stealth
+from .base_object import Object, stealth
+from tools.tools import log
 
 
 class Item(Object):
@@ -29,7 +30,7 @@ class Item(Object):
     @property
     def total_weight(self):
         if not self.weight_one:
-            log(f"Cannot get {self} total weight. Weight of one is unknown")
+            log.info(f"Cannot get {self} total weight. Weight of one is unknown")
             return
 
         return self.quantity * self.weight_one
