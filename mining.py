@@ -18,6 +18,10 @@ CUT_CORPSES = True
 GET_FREE_PICKAXE = True
 EQUIP_WEAPONS_FROM_GROUND = True
 EQUIP_WEAPONS_FROM_LOOT_CONTAINER = True
+RESURRECT_AND_RETURN = True
+HEALER_COORDS = constants.COORDS_MINOC_HEALER
+BANK_COORDS = (2512, 556)
+BANK_ID = 0x7277EC74
 MAX_WEAPON_SEARCH_DISTANCE = 20
 MOB_FIND_DISTANCE = 25
 FREE_PICKAXE_CONTAINERS = {
@@ -55,6 +59,7 @@ ITEM_IDS_MINING_TRASH = [
     constants.TYPE_ID_MACE,
     constants.TYPE_ID_DAGGER,
     *constants.TYPE_ID_SCROLLS,
+    0x1AE0,  # skull
 ]
 MINING_LOOT = [i for i in MINING_LOOT if i not in ITEM_IDS_MINING_TRASH]
 MINING_SPOTS = [
@@ -100,6 +105,7 @@ class Miner(ScriptBase):
         self._directions = []
         self._mining_spot = None
         self._direction = None
+        self.mining_i = 0
         x, y = MINING_CONTAINER_COORDS
         self.loot_container = Container.instantiate(MINING_CONTAINER_ID, x=x, y=y, z=None, fixed_coords=True)
         self.drop_types = [
@@ -124,7 +130,8 @@ class Miner(ScriptBase):
             self.wait_stamina()
             self.player.move(*self.loot_container.xy, accuracy=1)
             tools.ping_delay()
-        if self.player.last_container != self.loot_container and not self.player.open_container(self.loot_container):
+        if self.loot_container.exists and self.player.last_container != self.loot_container \
+                and not self.player.open_container(self.loot_container):
             tools.telegram_message(f"Failed to open {self.loot_container}")
         log("Moving to unload done")
 
@@ -247,6 +254,56 @@ class Miner(ScriptBase):
         return super().engage_mob(mob=mob, check_health_func=self.mine_check_health, loot=LOOT_CORPSES, cut=CUT_CORPSES,
                                   drop_trash_items=True, notify_only_mutated=True)
 
+    def resurrect(self):
+        log(f"Resurrecting and returning")
+        while self.player.dead:
+            log(f"Moving to healer {HEALER_COORDS}")
+            self.player.move(*HEALER_COORDS, accuracy=0)
+        reagent_types = [constants.TYPE_ID_REAGENT_MR, constants.TYPE_ID_REAGENT_BM, constants.TYPE_ID_REAGENT_BP]
+        while len(regs := self.player.find_types_backpack(reagent_types)) < 3 or self.player.xy == BANK_COORDS:
+            if self.player.xy != BANK_COORDS:
+                log(f"Moving to bank @ {BANK_COORDS}")
+                self.player.move(*BANK_COORDS, accuracy=0)
+            bank = Container.instantiate(BANK_ID)
+            if bank.is_empty:
+                log(f"Opening bank")
+                self.player.say('bank')
+                tools.result_delay()
+                self.player.hide()
+            if self.player.xy == BANK_COORDS:
+                log(f"Grabbing reagents {reagent_types}")
+                for reg_type in reagent_types:
+                    if self.player.got_item_type(reg_type):
+                        continue
+
+                    bank_item = self.player.find_type(reg_type, bank)
+                    if not bank_item:
+                        log(f"No reagent {reg_type} found @ bank")
+                        tools.telegram_message(f"Couldn't resurrect. No reagent {reg_type} found @ bank")
+                        self.disconnect()
+                        quit()
+                    grab_result = self.player.grab(bank_item, quantity=1)
+                    if not grab_result:
+                        log(f"Couldn't grab {reg_type}:{bank_item} from bank")
+                        tools.telegram_message(f"Couldn't resurrect. Couldn't grab {reg_type}:{bank_item} from bank")
+                        self.disconnect()
+                        quit()
+
+                rune = self.player.find_type(constants.TYPE_ID_RUNE, bank)
+                if rune:
+                    log(f"Casting Recall @ {rune}")
+                    stealth.CastToObject('recall', rune)
+                    stealth.Wait(5000)
+                    if self.player.xy != BANK_COORDS:
+                        break
+                else:
+                    log(f"No rune found @ bank")
+                    tools.telegram_message("Couldn't resurrect. No rune found @ bank")
+                    self.disconnect()
+                    quit()
+        self.move_to_unload()
+        self.unload()
+
     def mine_check_health(self):
         if self.check_health():
             pass
@@ -264,7 +321,8 @@ class Miner(ScriptBase):
         self.mine_check_health()
         if check_overweight:
             self.general_weight_check()
-        self.process_mobs()
+        if self.process_mobs():
+            self.mining_i = MINE_MAX_ITERATIONS  # force dig again after a mob is killed
         if loot_corpses:
             self.loot_corpses()
         self.check_weapon()
@@ -301,7 +359,7 @@ class Miner(ScriptBase):
 
     def do_mining(self):
         self.mine_direction()
-        i = 0
+        self.mining_i = 0
         while True:
             if tools.in_journal(r'skip \d+ spots', regexp=True):
                 spots_quantity = tools.in_journal(r'skip \d+ spots', regexp=True, return_re_value=True)
@@ -310,32 +368,33 @@ class Miner(ScriptBase):
                 for i in range(spots_quantity):
                     self.mining_spot_depleeted()
                 self._directions = []
-                i = 0
+                self.mining_i = 0
                 self.mine_direction()
                 continue
             elif tools.in_journal('skip spot'):
                 log(f"Skipping spot")
                 self._directions = []
-                i = 0
+                self.mining_i = 0
                 self.mine_direction()
                 continue
             elif any(_ for _ in MINING_ERRORS if tools.in_journal(_)):
-                self.player._use_cd = pendulum.now()
+                # self.player._use_cd = pendulum.now()  # todo: tryout
                 self.direction_depleeted()
-                i = 0
+                self.mining_i = 0
                 self._checks()
                 if self.general_weight_check():
-                    i = MINE_MAX_ITERATIONS  # force mine direction after smelt or unload
+                    self.mining_i = MINE_MAX_ITERATIONS  # force mine direction after smelt or unload
                 self.mine_direction()
                 continue
 
             self._checks(check_overweight=False, loot_corpses=False)
             # if self.general_weight_check():
             #     i = MINE_MAX_ITERATIONS  # force mine direction after smelt or unload
-            i += 1
-            if i > MINE_MAX_ITERATIONS:
+            self.mining_i += 1
+            if self.mining_i > MINE_MAX_ITERATIONS:
+                self.player._use_cd = pendulum.now()
                 self.mine_direction()
-                i = 0
+                self.mining_i = 0
 
             stealth.Wait(constants.USE_COOLDOWN)
 
@@ -373,6 +432,7 @@ class Miner(ScriptBase):
     def check_overweight(self, **kwargs):
         return super().check_overweight(drop_types=self.drop_types)
 
+    @alive_action
     @condition(GET_FREE_PICKAXE)
     def get_free_pickaxe(self):
         self.check_overweight()

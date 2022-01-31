@@ -186,6 +186,7 @@ class Player(Creature):
     def open_container(self, container, max_tries=10):
         container = Container.instantiate(container)
         if not container.exists or not container.is_container:
+            log(f"Cannot open non-container {container}")
             return
 
         i = 0
@@ -195,12 +196,22 @@ class Player(Creature):
                 log(f"Couldn't open {container} after {max_tries} tries")
                 return False
 
+        log(f"Successfuly opened {container}")
         return True
 
     @alive_action
     def attack(self, target_id):
         target_id = Creature.instantiate(target_id)
         return Attack(target_id.id_)
+
+    @property
+    def war_mode(self):
+        return WarMode()
+
+    @war_mode.setter
+    def war_mode(self, value):
+        if self.war_mode != value:
+            SetWarMode(value)
 
     def move_to_object(self, obj, optimized=True, accuracy=1, running=True):
         obj = Object.instantiate(obj)
@@ -375,6 +386,8 @@ class Player(Creature):
     @alive_action
     def find_types_container(self, type_ids, colors=None, container_ids=None, recursive=False):
         colors = colors or [0xFFFF]
+        if not isinstance(container_ids, Iterable):
+            container_ids = [container_ids]
         container_ids = container_ids or [self.backpack]
         containers = [Container.instantiate(i) for i in container_ids]
         container_ids = [i.id_ for i in containers]

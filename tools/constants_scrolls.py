@@ -1,4 +1,5 @@
 # SCROLLS
+
 TYPE_ID_SCROLLS = [
     0x1F51,
     0x1F42,
@@ -28,5 +29,9 @@ TYPE_ID_SCROLLS = [
     0x1F34,
     0x1F4A,
     0x1F3A,
+    0x1F40,
+    0x1F2E,
+    0x1F2D,
 ]
 TYPE_ID_SCROLLS = list(set(TYPE_ID_SCROLLS))
+TYPE_ID_SCROLLS = range(min(TYPE_ID_SCROLLS), max(TYPE_ID_SCROLLS) + 1)
