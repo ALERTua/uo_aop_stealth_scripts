@@ -134,11 +134,14 @@ class Object:
         return output
 
     def path_distance(self, optimized=True, accuracy=0):
-        if self.coords == (0, 0, 0, 0):  # creature coords unknown
+        if not self.exists:
+            return -1  # todo: consider this
+
+        if self.exists and self.coords == (0, 0, 0, 0):  # creature coords unknown
             return 99999
 
         output = self.path(optimized=optimized, accuracy=accuracy)
-        if len(output) == 0 and self.x != self.player_x and self.y != self.player_y:
+        if self.exists and len(output) == 0 and self.x != self.player_x and self.y != self.player_y:
             return 99999  # cannot build path to the creature
 
         self._path_distance = len(output)

@@ -1,5 +1,6 @@
 import signal
 import atexit
+from abc import abstractmethod
 from copy import copy
 from functools import wraps
 
@@ -130,23 +131,28 @@ class ScriptBase:
             log(f"Won't engage dead {mob}")
             return
 
-        distance = mob.path_distance()
-        if distance > 50:
-            log(f"Won't engage mob that {distance} this far away")
-            return
+        # distance = mob.path_distance()  # this is being checked before this function
+        # if distance > 50:
+        #     log(f"Won't engage mob that {distance} this far away")
+        #     return
 
-        log(f"Engaging {mob} distance {mob.path_distance()}")
+        log(f"Engaging {mob} at distance {mob.distance}")
         if mob.mutated:
             stealth.Alarm()
         while mob.alive:
-            self.player.move(mob.x, mob.y)
-            self.player.attack(mob.id_)
+            if mob.distance > 1:
+                self.player.move(mob.x, mob.y)
+                self.player.attack(mob.id_)
+            else:
+                log(f"Won't engage {mob} that is already at distance {mob.distance}")
             check_health_func()  # script_check_health in scripts
         log(f"Done Engaging {mob}")
+        self.player.war_mode = False
         if not notify_only_mutated or (notify_only_mutated and mob.mutated):
             tools.telegram_message(f"{mob} dead", disable_notification=not mob.mutated)
         if loot:
             self.player.loot_nearest_corpse(cut_corpse=cut, drop_trash_items=drop_trash_items)
+            self.drop_trash()
 
     @alive_action
     def drop_trash(self, trash_items=None):
@@ -232,11 +238,20 @@ class ScriptBase:
     def script_running_time_words(self):
         return self.script_running_time.in_words()
 
-    def check_health(self):
+    @abstractmethod
+    def resurrect(self):
+        raise NotImplemented()
+
+    def check_health(self, resurrect=False):
         if self.player.dead:
-            tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}')
-            self.player.move(*constants.COORDS_MINOC_HEALER)
-            self.quit()
+            if resurrect:
+                tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}. '
+                                       f'Resurrecting.')
+                self.resurrect()
+            else:
+                tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}')
+                self.player.move(*constants.COORDS_MINOC_HEALER)
+                self.quit()
         need_heal = (self.player.max_hp - self.player.hp) > (self.player.max_hp * 0.4)
         if need_heal:
             if self.player.got_bandages:
@@ -274,14 +289,18 @@ class ScriptBase:
         log("Eating")
         food = stealth.FindType(food_type, container_id)
         if not food:
-            log("WARNING! NO FOOD FOUND!")
-            tools.telegram_message(f"{self.player}: No food found", disable_notification=True)
-            return
+            self.player.open_container(container_id)
+            food = stealth.FindType(food_type, container_id)
+            if not food:
+                log("WARNING! NO FOOD FOUND!")
+                tools.telegram_message(f"{self.player}: No food found", disable_notification=True)
+                return
 
         self.player.use_object(food)
 
     @alive_action
     def process_mobs(self, engage=True, notify_only_mutated=True, mob_find_distance=20):
+        output = False
         while creatures := self.player.find_red_creatures(
                 distance=mob_find_distance, condition=lambda i: i not in self._processed_mobs):
             for creature in creatures:
@@ -300,8 +319,11 @@ class ScriptBase:
                     if mob_distance > max_distance:
                         log(f"Won't engage {mob}. Distance path: {mob_distance} > {max_distance}")
                     else:
+                        self.drop_overweight_items()
                         self.engage_mob(mob)
+                        output = True
                 self._processed_mobs.append(creature)
+        return output
 
     @alive_action
     def rearm_from_container(self, weapon_type_ids=None, container_id=None):
