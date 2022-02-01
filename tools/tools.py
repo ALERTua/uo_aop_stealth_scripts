@@ -42,25 +42,22 @@ def get_prev_function_name():
     return output
 
 
-def in_journal(text, regexp=False, return_re_value=False, limit_last=50):
+def in_journal(text, regexp=False, return_re_value=False, limit_last=50, from_index=None, to_index=None,
+               journal_lines=None):
     """Returns whether the supplied text is ANYWHERE in the journal"""
-    high_journal = stealth.HighJournal()
-    low_journal = stealth.LowJournal()
-    if limit_last:
-        low_journal = high_journal - limit_last
-    range_ = range(low_journal, high_journal + 1)
-    if len(range_) > 55:
-        log.info(f"Parsing too long journal: {low_journal} to {high_journal} range {range_} for text: {text}")
-    for line in [stealth.Journal(i) for i in range_]:
-        if regexp:
-            if re.search(text, line, re.IGNORECASE | re.MULTILINE):
-                if return_re_value:
-                    return re.findall(text, line)
-                else:
-                    return True
-        else:
-            if text.lower() in line.lower():
-                return True
+    if journal_lines is None:
+        high_journal = stealth.HighJournal() if to_index is None else to_index
+        low_journal = stealth.LowJournal() if from_index is None else from_index
+        if limit_last:
+            low_journal = high_journal - limit_last
+        range_ = range(low_journal, high_journal + 1)
+        if len(range_) > 55:
+            log.info(f"Parsing too long journal: {low_journal} to {high_journal} range {range_} for text: {text}")
+        journal_lines = [constants.JournalLine(i) for i in range_]
+    for line in journal_lines:
+        output = line.contains(text, regexp=regexp, return_re_value=return_re_value)
+        if output:
+            return output
 
     return False
 

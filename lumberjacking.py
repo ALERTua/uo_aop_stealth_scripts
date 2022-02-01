@@ -14,7 +14,7 @@ from tools.tools import log
 LJ_SLOGS = True
 ENGAGE_MOBS = True
 ENGAGE_CRITTERS = True
-MOB_FIND_DISTANCE = 20
+MOB_FIND_DISTANCE = 25
 LOOT_CORPSES = True
 CUT_CORPSES = True
 HOLD_BANDAGES = 2
@@ -127,7 +127,7 @@ class Lumberjack(ScriptBase):
 
     @property
     def got_hatchet(self):
-        return self.hatchet not in (None, 0, -1)
+        return self.hatchet.exists
 
     def pick_up_items(self, **kwargs):
         return super().pick_up_items(LJ_LOOT)
@@ -153,13 +153,13 @@ class Lumberjack(ScriptBase):
                 self.go_woods()
             self.wait_stamina()
             self.player.move(*self.loot_container.xy, accuracy=0)
+            log.info("Moving to unload done")
         tools.ping_delay()
-        self.player.use_object(self.loot_container)
-        log.info("Moving to unload done")
+        self.player.open_container(self.loot_container)
 
     @alive_action
     def check_hatchet(self):
-        if self.hatchet:
+        if self.got_hatchet:
             return True
 
         if self.in_woods:
@@ -188,8 +188,7 @@ class Lumberjack(ScriptBase):
         return super().eat(container_id=self.loot_container)
 
     def count_logs(self, recursive=True):
-        logs_type_ids = (constants.TYPE_ID_LOGS,)
-        logs = self.player.find_types_backpack(type_ids=logs_type_ids, colors=constants.COLOR_LOGS, recursive=recursive)
+        logs = self.player.find_types_backpack(type_ids=LJ_LOOT, recursive=recursive)
         if not logs:
             return
 
@@ -198,15 +197,14 @@ class Lumberjack(ScriptBase):
             log_type = log_obj.type_id
             log_color = log_obj.color
             log_quantity = log_obj.quantity
-            if self.script_stats.get(log_type, None) is None:
-                self.script_stats[log_type] = {}
-            if self.script_stats[log_type].get(log_color, None) is None:
-                self.script_stats[log_type][log_color] = 0
-            self.script_stats[log_type][log_color] += log_quantity
+            log_name = log_obj.name_short
+            entry_name = f"{log_type}({log_color}){log_name}"
+            if self.script_stats.get(entry_name, None) is None:
+                self.script_stats[entry_name] = 0
+            self.script_stats[entry_name] += log_quantity
 
     def unload(self):
         log.info("Unloading")
-        self.move_to_unload()
         self.move_to_unload()
         self.count_logs()
         self.parse_commands()
@@ -227,8 +225,9 @@ class Lumberjack(ScriptBase):
             self.general_weight_check()
             self.check_overweight()
 
-        self.player.use_object_on_tile(self.hatchet, tile_type, x, y, z)
         self.parse_commands()
+        self.player.use_object_on_tile(self.hatchet, tile_type, x, y, z)
+        tools.result_delay()
 
     @property
     def got_logs(self):
@@ -248,9 +247,11 @@ class Lumberjack(ScriptBase):
     def jack_tree(self):
         while self.player.overweight:
             self.general_weight_check()
+        # self.lj_check_hatchets()
         self.move_to_tree()
-        stealth.ClearJournal()
         self._jack_tree(*self.current_tree)
+        output = stealth.HighJournal()
+        return output
 
     def check_overweight(self, **kwargs):
         return super().check_overweight(self.drop_types)
@@ -281,6 +282,7 @@ class Lumberjack(ScriptBase):
         self.unload()
         self.go_woods()
         self.move_to_tree()
+        self.lj_i = MAX_LJ_ITERATIONS
 
     def engage_mob(self, mob: Mob, **kwargs):
         return super().engage_mob(mob=mob, check_health_func=self.lj_check_health, loot=LOOT_CORPSES, cut=CUT_CORPSES,
@@ -295,6 +297,7 @@ class Lumberjack(ScriptBase):
             self.lj_i = MAX_LJ_ITERATIONS  # force dig again after a mob is killed
         if loot_corpses:
             self.loot_corpses()
+        self.lj_check_hatchets()
         self.check_weapon()
         self.pick_up_items()
         if check_overweight:
@@ -304,40 +307,45 @@ class Lumberjack(ScriptBase):
             self.general_weight_check()
 
     def lumberjack_process(self):
-        self.jack_tree()
+        journal_index = self.jack_tree()
         self.lj_i = 0
         while True:
-            if msg := tools.in_journal(r'skip \d+ tree[s]', regexp=True, return_re_value=True):
-                trees_quantity = int(re.findall(r'\d+', msg[0])[0])
+            journal_contents = tools.journal(start_index=journal_index)
+            skip = [j for j in journal_contents
+                    if j.contains(r'skip \d+ tree[s]{0,1}', regexp=True, return_re_value=True)]
+            if any(skip):
+                trees_quantity = int(re.findall(r'\d+', skip[0])[0])
                 log.info(f"Skipping {trees_quantity} trees")
                 for i in range(trees_quantity):
                     self.tree_depleeted()
                 self.lj_i = 0
-                self.jack_tree()
+                journal_index = self.jack_tree()
                 continue
-            elif any(_ for _ in LJ_ERRORS if tools.in_journal(_)):
+
+            errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
+            if errors:
+                log.debug(f"Depletion message detected: {errors[0]}")
                 self.tree_depleeted()
                 self.lj_i = 0
                 self._checks()
                 if self.general_weight_check():
                     self.lj_i = MAX_LJ_ITERATIONS
-                self.jack_tree()
+                journal_index = self.jack_tree()
                 continue
 
-            self._checks()  # check for overweight too, and loot corpses
+            self._checks(loot_corpses=False)  # check for overweight too, and loot corpses
             self.lj_i += 1
             if self.lj_i > MAX_LJ_ITERATIONS:
-                self.player._use_cd = pendulum.now()
-                self.jack_tree()
+                journal_index = self.jack_tree()
                 self.lj_i = 0
 
-            last_journal_message = stealth.LastJournalMessage()
-            log.info(f"{self.lj_i}/{MAX_LJ_ITERATIONS} Waiting for lumberjacking to complete: {last_journal_message}")
+            log.info(f"{self.lj_i}/{MAX_LJ_ITERATIONS} Waiting for lumberjacking to complete: "
+                     f"{journal_contents[-1].text}")
             stealth.Wait(constants.USE_COOLDOWN)
 
     @condition(LOOT_CORPSES)
     def loot_corpses(self, **kwargs):
-        return super().loot_corpses(drop_trash_items=True, trash_items=LJ_TRASH)
+        return super().loot_corpses(cut_corpses=CUT_CORPSES, trash_items=LJ_TRASH)
 
     def drop_trash(self, **kwargs):
         return super(Lumberjack, self).drop_trash(trash_items=LJ_TRASH)

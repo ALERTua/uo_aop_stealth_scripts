@@ -194,7 +194,7 @@ class Player(Creature):
                 log.info(f"Couldn't open {container} after {max_tries} tries")
                 return False
 
-        log.info(f"Successfuly opened {container}")
+        log.debug(f"Successfuly opened {container}")
         return True
 
     @alive_action
@@ -258,7 +258,7 @@ class Player(Creature):
         while not (move_result := MoveItem(item.id_, quantity, container.id_, x, y, z)) \
                 and item.parent == item_container and (i := i + 1) < max_tries:
             log.info(f".")
-        log.info(f"done. Moving success: {move_result}")
+        log.debug(f"done. Moving success: {move_result}")
         return move_result
 
     @alive_action
@@ -279,7 +279,7 @@ class Player(Creature):
         while not (grab_result := Grab(item.id_, quantity)) and item.parent == item_container \
                 and (i := i + 1) < max_tries:
             log.info(f".")
-        log.info(f"done. Grabbing success: {grab_result}")
+        log.debug(f"done. Grabbing success: {grab_result}")
         return grab_result
 
     @alive_action
@@ -300,7 +300,7 @@ class Player(Creature):
         while not (drop_result := Drop(item.id_, quantity, 0, 0, 0)) and item.parent == item_container \
                 and (i := i + 1) < max_tries:
             log.info(f".")
-        log.info(f"done. Dropping success: {drop_result}")
+        log.debug(f"done. Dropping success: {drop_result}")
         return drop_result
 
     @use_cd
@@ -454,7 +454,7 @@ class Player(Creature):
                 if (ore.exists and ore_quantity_after) and ore_quantity_before == ore_quantity_after:
                     log.info(f"Smelt unsuccessful! {ore_quantity_before} x {ore}")
                 else:
-                    log.info(f"Smelt successful: {ore_quantity_before} x {ore}")
+                    log.debug(f"Smelt successful: {ore_quantity_before} x {ore}")
 
     @alive_action
     @bandage_cd

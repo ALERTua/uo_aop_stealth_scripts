@@ -48,7 +48,7 @@ class ScriptBase:
         self._commands_cooldown = {}
         self._looted_corpses = []
         self._checked_weapons = []
-        self._event_timer_1 = 0
+        self.commands_journal_index = stealth.HighJournal()
         atexit.register(self.at_exit)
 
     def _register_signals(self):
@@ -68,8 +68,9 @@ class ScriptBase:
         self.at_exit()
         stealth.StopAllScripts()
 
-    def _parse_command(self, command):
-        return tools.in_journal(f'{self.player.name}: {command}') and not self._commmand_on_cooldown(command)
+    def _parse_command(self, command, start_index=None, journal_lines=None):
+        return tools.in_journal(f'{self.player.name}: {command}', from_index=start_index, journal_lines=journal_lines) \
+               and not self._commmand_on_cooldown(command)
 
     def _commmand_on_cooldown(self, command):
         record = self._commands_cooldown.get(command)
@@ -88,23 +89,19 @@ class ScriptBase:
         if self.script_stats:
             return log.info(f"{self} stats:\n{self.script_stats_str}")
 
-    # def callback_command_parser(self, **kwargs):  # todo: investigate inconsistent runs
-    #     self._event_timer_1 += 1  # evTimer1 executes every 100ms
-    #     if self._event_timer_1 >= 100:
-    #         self.parse_commands()
-    #         log.info(f"callback_command_parser: {kwargs}")
-    #         self._event_timer_1 = 0
-
     def parse_commands(self):
-        if self._parse_command('quit'):
+        journal = tools.journal(start_index=self.commands_journal_index)
+        if self._parse_command('quit', journal_lines=journal):
             self._command_add_cooldown('quit')
             return self.quit()
-        elif self._parse_command('stop'):
+        elif self._parse_command('stop', journal_lines=journal):
             self._command_add_cooldown('stop')
             return self.stop()
-        elif self._parse_command('stats'):
+        elif self._parse_command('stats', journal_lines=journal):
             self._command_add_cooldown('stats')
             return self.report_stats()
+
+        self.commands_journal_index = stealth.HighJournal()
 
     @property
     def script_stats_str(self):
@@ -172,13 +169,13 @@ class ScriptBase:
         return self.player.drop_trash_items(trash_items)
 
     @alive_action
-    def loot_corpses(self, drop_trash_items=True, trash_items=None):
+    def loot_corpses(self, drop_trash_items=True, trash_items=None, cut_corpses=True):
         corpses = [Container.instantiate(i) for i in self.player.find_types_ground(constants.TYPE_ID_CORPSE)]
         for corpse in corpses:
             if corpse in self._looted_corpses:
                 continue
 
-            self.player.loot_nearest_corpse(corpse_id=corpse, cut_corpse=False, drop_trash_items=drop_trash_items,
+            self.player.loot_nearest_corpse(corpse_id=corpse, cut_corpse=cut_corpses, drop_trash_items=drop_trash_items,
                                             trash_items=trash_items)
             self._looted_corpses.append(corpse)
         self.player.drop_trash_items(trash_item_ids=trash_items)

@@ -24,6 +24,15 @@ class Item(Object):
         self._name = value
 
     @property
+    def name_short(self):
+        name = self.name
+        if not name:
+            return self._id
+
+        short_name = name.split(':')[0].strip()
+        return short_name
+
+    @property
     def quantity(self):
         return stealth.GetQuantity(self._id)
 

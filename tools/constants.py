@@ -1,3 +1,4 @@
+import re
 from enum import Enum, unique
 from .constants_weapons import *
 from .constants_armor import *
@@ -35,19 +36,38 @@ class LineColor(Enum):
 class JournalLine:
     def __init__(self, journal_id):
         self.journal_id = journal_id
-        self.text = Journal(self.journal_id)
-        self.color = LineTextColor()
+        self.text = stealth.Journal(self.journal_id)
+        self.color = stealth.LineTextColor()
         try:
             self.color = LineColor(self.color)
         except:
             pass
-        self.author = LineName()
-        self.time = LineTime()
+        self.author = stealth.LineName()
+        self.time = stealth.LineTime()
         # self.msg_type = LineMsgType()
         # self.count = LineCount()
         # self.line_id = LineID()
         # self.type = LineType()
         # self.font = LineTextFont()
+
+    def __str__(self):
+        return self.text
+
+    def __repr__(self):
+        return self.__str__()
+
+    def contains(self, text, regexp=False, return_re_value=False):
+        if regexp:
+            if re.search(text, self.text, re.IGNORECASE | re.MULTILINE):
+                if return_re_value:
+                    return re.findall(text, self.text, re.IGNORECASE | re.MULTILINE)
+                else:
+                    return True
+        else:
+            if text.lower() in self.text.lower():
+                return True
+
+        return False
 
 
 # RANGES
