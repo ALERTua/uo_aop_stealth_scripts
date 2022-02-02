@@ -23,14 +23,14 @@ def debug(ip=None):
 
     ip = ip or 'localhost'
     port = 12345
-    print("Connecting to PyCharm Debugger @ %s:%s" % (ip, port))
+    log.info("Connecting to PyCharm Debugger @ %s:%s" % (ip, port))
     try:
         pydevd_pycharm.settrace(ip, port=port, stdoutToServer=True, stderrToServer=True, suspend=False)
     except Exception as e:
         print("Error connecting to PyCharm Debugger @ %s:%s : %s %s" % (ip, port, type(e), e))
         return False
 
-    print("Connected to PyCharm Debugger @ %s:%s" % (ip, port))
+    log.info("Connected to PyCharm Debugger @ %s:%s" % (ip, port))
     log.verbose = True
     return True
 
