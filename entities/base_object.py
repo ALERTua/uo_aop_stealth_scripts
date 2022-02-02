@@ -4,6 +4,8 @@ from tools.tools import log
 
 
 class Object:
+    cache = {}
+
     def __init__(self, _id, type_id=None, color=None, name=None, path_distance=99999, x=None, y=None, z=None,
                  fixed_coords=False, _direct=True):
         assert _direct is False, "Please use .instantiate classmethod"
@@ -19,7 +21,7 @@ class Object:
 
     def __eq__(self, other):
         try:
-            output = (type(self) == type(other)) and (self.id_ == other.id_)
+            output = (self.__class__ == other.__class__) and (self.id_ == other.id_)
             return output
         except:
             return False
@@ -31,14 +33,25 @@ class Object:
         return self.__str__()
 
     @classmethod
+    def _get_cached(cls, id_, *args, **kwargs):
+        if id_ in Object.cache.keys() and Object.cache[id_].__class__ == cls:
+            output = Object.cache[id_]
+            # log.debug(f"Returning cached {output}")
+        else:
+            output = cls(id_, _direct=False, *args, **kwargs)
+            Object.cache[id_] = output
+            # log.debug(f"Creating {output}")
+        return output
+
+    @classmethod
     def instantiate(cls, obj, *args, **kwargs):
         if isinstance(obj, (cls, *cls.__subclasses__())):
             return obj
 
         if isinstance(obj, Object):  # todo: not perfect
-            return cls(obj._id, _direct=False, *args, **kwargs)
+            return cls._get_cached(obj.id_, *args, **kwargs)
 
-        return cls(obj, _direct=False, *args, **kwargs)
+        return cls._get_cached(obj, *args, **kwargs)
 
     @property
     def id_(self):
