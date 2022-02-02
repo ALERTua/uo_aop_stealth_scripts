@@ -1,6 +1,5 @@
 import inspect
 import os
-import re
 from datetime import datetime
 from typing import List
 
@@ -10,29 +9,31 @@ from global_logger import Log
 log = Log.get_logger(use_colors=False)
 
 
-def debug():
+def debug(ip=None):
     try:
         # pylint: disable=import-error
         import pydevd_pycharm  # noqa: E402
     except:
         os.system('pip install -U pydevd-pycharm')
-        return debug()
+        return debug(ip=ip)
 
-    ip = 'localhost'
+    ip = ip or 'localhost'
     port = 12345
     print("Connecting to PyCharm Debugger @ %s:%s" % (ip, port))
     try:
         pydevd_pycharm.settrace(ip, port=port, stdoutToServer=True, stderrToServer=True, suspend=False)
     except Exception as e:
         print("Error connecting to PyCharm Debugger @ %s:%s : %s %s" % (ip, port, type(e), e))
-    else:
-        print("Connected to PyCharm Debugger @ %s:%s" % (ip, port))
+        return False
+
+    print("Connected to PyCharm Debugger @ %s:%s" % (ip, port))
     log.verbose = True
+    return True
 
 
 DEBUG = True
 if DEBUG:
-    debug()
+    debug() or debug('192.168.1.2')
 
 
 def get_prev_function_name():
