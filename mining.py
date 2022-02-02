@@ -253,7 +253,7 @@ class Miner(ScriptBase):
         return super().check_health(resurrect=RESURRECT_AND_RETURN)
 
     def process_mobs(self, **kwargs):
-        return super().process_mobs(engage=ENGAGE_MOBS, notify_only_mutated=True, mob_find_distance=MOB_FIND_DISTANCE,
+        return super().process_mobs(engage=ENGAGE_MOBS, notify_mutated=True, mob_find_distance=MOB_FIND_DISTANCE,
                                     drop_overweight_items=self.drop_types)
 
     def mine_check_health(self):

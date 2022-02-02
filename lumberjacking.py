@@ -21,6 +21,7 @@ HOLD_BANDAGES = 2
 RESURRECT_AND_RETURN = True
 EQUIP_WEAPONS_FROM_GROUND = True
 EQUIP_WEAPONS_FROM_LOOT_CONTAINER = True
+RESET_PROCESSED_MOBS_ON_UNLOAD = True
 MAX_WEAPON_SEARCH_DISTANCE = 20
 MAX_LJ_ITERATIONS = 2
 LJ_DISTANCE_TO_TREE = 1
@@ -133,7 +134,7 @@ class Lumberjack(ScriptBase):
         return super().pick_up_items(LJ_LOOT)
 
     def process_mobs(self, **kwargs):
-        return super().process_mobs(engage=ENGAGE_MOBS, notify_only_mutated=True, mob_find_distance=MOB_FIND_DISTANCE,
+        return super().process_mobs(engage=ENGAGE_MOBS, notify_mutated=True, mob_find_distance=MOB_FIND_DISTANCE,
                                     drop_overweight_items=self.drop_types)
 
     def move_to_tree(self):
@@ -213,6 +214,9 @@ class Lumberjack(ScriptBase):
         self.check_bandages()
         self.rearm_from_container()
         self.eat()
+        if RESET_PROCESSED_MOBS_ON_UNLOAD:
+            self._processed_mobs = []
+        self.report_stats()
 
     def tree_depleeted(self):
         log.info(f"{len(self._trees)}/{len(LJ_SPOTS)} Tree depleeted: {self.current_tree}.")
@@ -249,6 +253,7 @@ class Lumberjack(ScriptBase):
             self.general_weight_check()
         # self.lj_check_hatchets()
         self.move_to_tree()
+        self.parse_commands()
         self._jack_tree(*self.current_tree)
         output = stealth.HighJournal()
         return output
@@ -311,10 +316,11 @@ class Lumberjack(ScriptBase):
         self.lj_i = 0
         while True:
             journal_contents = tools.journal(start_index=journal_index)
-            skip = [j for j in journal_contents
-                    if j.contains(r'skip \d+ tree[s]{0,1}', regexp=True, return_re_value=True)]
+            skip = [j for j in journal_contents if j.contains(r'skip \d+', regexp=True, return_re_value=True)]
             if any(skip):
-                trees_quantity = int(re.findall(r'\d+', skip[0])[0])
+                text = skip[0].text
+                numbers = re.findall(r'\d+', text)
+                trees_quantity = int(numbers[0])
                 log.info(f"Skipping {trees_quantity} trees")
                 for i in range(trees_quantity):
                     self.tree_depleeted()

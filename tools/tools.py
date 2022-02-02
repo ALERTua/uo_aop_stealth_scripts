@@ -2,11 +2,15 @@ import inspect
 import os
 from datetime import datetime
 from typing import List
+import ping3
 
+from entities.journal_line import JournalLine
 import py_stealth as stealth
-from tools import constants
+
 from global_logger import Log
 log = Log.get_logger(use_colors=False)
+_server_ip = None
+_server_ping_average = {}
 
 
 def debug(ip=None):
@@ -54,7 +58,7 @@ def in_journal(text, regexp=False, return_re_value=False, limit_last=50, from_in
         range_ = range(low_journal, high_journal + 1)
         if len(range_) > 55:
             log.info(f"Parsing too long journal: {low_journal} to {high_journal} range {range_} for text: {text}")
-        journal_lines = [constants.JournalLine(i) for i in range_]
+        journal_lines = [JournalLine(i) for i in range_]
     for line in journal_lines:
         output = line.contains(text, regexp=regexp, return_re_value=return_re_value)
         if output:
@@ -88,15 +92,11 @@ def _delay(delay=250):
 
 
 def ping_delay():
-    return _delay(250)
+    return _delay(server_ping_average() + 10)
 
 
 def result_delay():
-    return _delay(500)
-
-
-def useobject_delay():
-    return _delay(constants.USE_COOLDOWN)
+    return _delay(server_ping_average() + 100)
 
 
 def string_in_strings(str_, strings):
@@ -109,14 +109,58 @@ def journal(start_index=None, end_index=None):
     line_numbers = range(start_index, end_index + 1)
     output = []
     for line_number in line_numbers:
-        output.append(constants.JournalLine(line_number))
+        output.append(JournalLine(line_number))
     return output
 
 
-def journal_lines_for_timedelta(self, start: datetime, end: datetime) -> List[constants.JournalLine]:
+def journal_lines_for_timedelta(self, start: datetime, end: datetime) -> List[JournalLine]:
     potential_end_index = stealth.InJournalBetweenTimes(' ', start, end)
     end_index = None if potential_end_index in (-1, None) else potential_end_index + 1
     return [line for line in self._journal(end_index=end_index) if start <= line.time <= end]
+
+
+def server_ip():
+    global _server_ip
+    if _server_ip is None:
+        _server_ip = stealth.GameServerIPString()
+    return _server_ip
+
+
+def server_ping(ip=None):
+    fallback = 250
+    ip = ip or server_ip()
+    ping = ping3.ping(ip)
+    if not ping:
+        return fallback
+
+    ping *= 1000
+    ping = round(ping, 0)
+    ping = int(ping)
+    return ping
+
+
+def server_ping_average(ip=None, iterations=5, singleton=True):
+    def _ping_average(_ip, _iterations):
+        pings = []
+        for _ in range(_iterations):
+            ping = server_ping(ip=_ip)
+            pings.append(ping)
+
+        _output = sum(pings) / len(pings)
+        _output = round(_output, 0)
+        _output = int(_output)
+        return _output
+
+    if singleton:
+        global _server_ping_average
+        if _server_ping_average.get(ip) is None:
+            _server_ping_average[ip] = _ping_average(_ip=ip, _iterations=iterations)
+            log.debug(f"Setting server IP {ip} {iterations} pings average to {_server_ping_average[ip]}")
+        return _server_ping_average[ip]
+
+    output = _ping_average(_ip=ip, _iterations=iterations)
+    log.debug(f"Returning server IP {ip} {iterations} pings average: {output}")
+    return output
 
 
 def __main():

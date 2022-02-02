@@ -1,20 +1,19 @@
-import signal
 import atexit
+import pprint
+import signal
 from abc import abstractmethod
 from copy import copy
 from functools import wraps
 
 import pendulum
-import pprint
 
+import py_stealth as stealth
 from tools import constants, tools
+from tools.tools import log
 from .container import Container
 from .item import Item
 from .mob import Mob
 from .player import Player, alive_action
-import py_stealth as stealth
-from tools.tools import log
-
 
 BANK_COORDS = (2512, 556)
 HEALER_COORDS = constants.COORDS_MINOC_HEALER
@@ -145,7 +144,7 @@ class ScriptBase:
         #     log.info(f"Won't engage mob that {distance} this far away")
         #     return
 
-        log.info(f"Engaging {mob} at distance {mob.distance}")
+        log.info(f"Engaging {mob.hp}/{mob.max_hp} {mob} at distance {mob.distance}")
         if mob.mutated:
             stealth.Alarm()
         while mob.alive:
@@ -160,6 +159,7 @@ class ScriptBase:
         if not notify_only_mutated or (notify_only_mutated and mob.mutated):
             tools.telegram_message(f"{mob} dead", disable_notification=not mob.mutated)
         if loot:
+            self.player.break_action()
             self.player.loot_nearest_corpse(cut_corpse=cut, drop_trash_items=drop_trash_items)
             self.drop_trash()
 
@@ -221,6 +221,7 @@ class ScriptBase:
                 drop_result = self.player.drop_item(drop_item, drop_quantity)
                 if drop_result:
                     log.info(f"Drop successful")
+                    tools.result_delay()
                     break
 
     def quit(self, alarm=True):
@@ -249,6 +250,7 @@ class ScriptBase:
 
     def resurrect(self):
         log.info(f"Resurrecting and returning")
+        self._processed_mobs = []
         while self.player.dead:
             log.info(f"Moving to healer {HEALER_COORDS}")
             self.player.move(*HEALER_COORDS, accuracy=0)
@@ -358,10 +360,12 @@ class ScriptBase:
             tools.telegram_message(f"{self.player}: No food found", disable_notification=True)
             return
 
+        food = Item.instantiate(food)
         self.player.use_object(food)
 
     @alive_action
-    def process_mobs(self, engage=True, notify_only_mutated=True, mob_find_distance=20, drop_overweight_items=None):
+    def process_mobs(self, engage=True, notify_mutated=True, notify_ranged=True, notify_errors=True,
+                     mob_find_distance=20, drop_overweight_items=None):
         output = False
         while creatures := self.player.find_creatures(
                 distance=mob_find_distance, notorieties=[constants.Notoriety.Murderer],
@@ -372,19 +376,31 @@ class ScriptBase:
 
                 # noinspection PyProtectedMember
                 mob = Mob.instantiate(creature.id_, path_distance=creature._path_distance)
-                if not notify_only_mutated or (notify_only_mutated and mob.mutated):
+                if mob.dead:
+                    continue
+
+                notify = (notify_mutated and mob.mutated) or (
+                            notify_ranged and mob.type_id in constants.TYPE_IDS_MOB_RANGED)
+                if notify:
                     tools.telegram_message(f"{mob} detected at distance {mob.path_distance()}",
                                            disable_notification=not mob.mutated)
                 if engage:
                     # noinspection PyProtectedMember
                     mob_distance = mob._path_distance  # we already got this
                     max_distance = constants.ENGAGE_MAX_DISTANCE
-                    if mob_distance > max_distance or mob_distance <= 1:
-                        log.info(f"Won't engage {mob}. Distance path: {mob_distance}, max distance: {max_distance}")
+                    if mob_distance <= 1:
+                        log.info(f"Already at {mob} at distance path {mob_distance}")
+                    elif mob_distance > max_distance:
+                        msg = f"Won't engage {mob}. Distance path: {mob_distance}, max distance: {max_distance}"
+                        log.info(msg)
+                        tools.telegram_message(msg)
                     else:
                         if drop_overweight_items:
                             self.drop_overweight_items(drop_overweight_items)
                         self.engage_mob(mob)
+                        if notify:
+                            dead = mob.dead
+                            tools.telegram_message(f"Done engaging {mob}. Dead: {dead}", disable_notification=dead)
                         output = True
                 self._processed_mobs.append(creature)
         return output

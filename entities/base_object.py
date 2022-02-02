@@ -19,7 +19,8 @@ class Object:
 
     def __eq__(self, other):
         try:
-            return (type(self) == type(other)) and (self.id_ == other.id_)
+            output = (type(self) == type(other)) and (self.id_ == other.id_)
+            return output
         except:
             return False
 

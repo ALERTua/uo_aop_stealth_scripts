@@ -173,16 +173,22 @@ class Player(Creature):
 
     def _open_container(self, container):
         container = Container.instantiate(container)
+        if self.last_container == container and not container.is_empty:
+            return True
+
         self.use_object(container)
         for _ in range(1):  # double check result
             tools.result_delay()
-            if LastContainer() == container.id_:
+            if self.last_container == container:
                 return True
 
         return False
 
     def open_container(self, container, max_tries=10):
         container = Container.instantiate(container)
+        if self.last_container == container and not container.is_empty:
+            return
+
         if not container.exists or not container.is_container:
             log.info(f"Cannot open non-container {container}")
             return
@@ -258,6 +264,7 @@ class Player(Creature):
         while not (move_result := MoveItem(item.id_, quantity, container.id_, x, y, z)) \
                 and item.parent == item_container and (i := i + 1) < max_tries:
             log.info(f".")
+            tools.result_delay()
         log.debug(f"done. Moving success: {move_result}")
         return move_result
 
@@ -377,9 +384,9 @@ class Player(Creature):
 
     @alive_action
     def break_action(self):
-        SetWarMode(True)
-        Wait(50)
-        SetWarMode(False)
+        self.war_mode = True
+        tools.ping_delay()
+        self.war_mode = False
 
     def find_type(self, type_id, container=None):
         container = Container.instantiate(container)
@@ -460,7 +467,9 @@ class Player(Creature):
     @bandage_cd
     def bandage_self(self):
         if self.hp < self.max_hp:
-            self.say("'pc heal self")
+            cmd = "'pc heal self"
+            log.info(f"Healing self with {cmd}")
+            self.say(cmd)
 
     @alive_action
     def bandage_self_if_hurt(self):
@@ -561,6 +570,7 @@ class Player(Creature):
             log.info(f"Cannot cut corpse {corpse_or_id}. No cutting tool.")
             return
 
+        log.info(f"Cutting {corpse_or_id}")
         self.use_object_on_object(cutting_tool, corpse)
 
     def path_to_coords(self, x, y, optimized=True, accuracy=0):

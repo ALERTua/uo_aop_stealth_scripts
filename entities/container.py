@@ -1,3 +1,4 @@
+from entities.journal_line import LineColor
 from entities.item import Item, stealth
 from tools import tools, constants
 from tools.tools import log
@@ -30,18 +31,18 @@ class Container(Item):
 
     @property
     def innocent(self):
-        return any(i for i in self._get_click_info() if i.color == constants.LineColor.INNOCENT)
+        return any(i for i in self._get_click_info() if i.color == LineColor.INNOCENT)
 
     @property
     def locked(self):
         return any(i for i in self._get_click_info()
-                   if i.color == constants.LineColor.WHITE
+                   if i.color == LineColor.WHITE
                    and 'locked down' in i.text.lower())
 
     @property
     def secure(self):
         return any(i for i in self._get_click_info()
-                   if i.color == constants.LineColor.WHITE
+                   if i.color == LineColor.WHITE
                    and 'secure' in i.text.lower())
 
 

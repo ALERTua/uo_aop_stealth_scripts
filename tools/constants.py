@@ -1,13 +1,21 @@
-import re
 from enum import Enum, unique
-from .constants_weapons import *
+# noinspection PyUnresolvedReferences
 from .constants_armor import *
-from .constants_gems import *
-from .constants_reagents import *
-from .constants_food import *
-from .constants_scrolls import *
+# noinspection PyUnresolvedReferences
 from .constants_colors import *
+# noinspection PyUnresolvedReferences
 from .constants_creatures import *
+# noinspection PyUnresolvedReferences
+from .constants_food import *
+# noinspection PyUnresolvedReferences
+from .constants_gems import *
+# noinspection PyUnresolvedReferences
+from .constants_reagents import *
+# noinspection PyUnresolvedReferences
+from .constants_scrolls import *
+# noinspection PyUnresolvedReferences
+from .constants_weapons import *
+from . import tools
 
 
 @unique
@@ -23,53 +31,6 @@ class Notoriety(Enum):
     Player = 65
 
 
-@unique
-class LineColor(Enum):
-    GREY = 946
-    INNOCENT = 90
-    RED = 38
-    SPEECH = 690
-    YELLOW = 55
-    WHITE = 1153
-
-
-class JournalLine:
-    def __init__(self, journal_id):
-        self.journal_id = journal_id
-        self.text = stealth.Journal(self.journal_id)
-        self.color = stealth.LineTextColor()
-        try:
-            self.color = LineColor(self.color)
-        except:
-            pass
-        self.author = stealth.LineName()
-        self.time = stealth.LineTime()
-        # self.msg_type = LineMsgType()
-        # self.count = LineCount()
-        # self.line_id = LineID()
-        # self.type = LineType()
-        # self.font = LineTextFont()
-
-    def __str__(self):
-        return self.text
-
-    def __repr__(self):
-        return self.__str__()
-
-    def contains(self, text, regexp=False, return_re_value=False):
-        if regexp:
-            if re.search(text, self.text, re.IGNORECASE | re.MULTILINE):
-                if return_re_value:
-                    return re.findall(text, self.text, re.IGNORECASE | re.MULTILINE)
-                else:
-                    return True
-        else:
-            if text.lower() in self.text.lower():
-                return True
-
-        return False
-
-
 # RANGES
 AGGRO_RANGE = 15
 ENGAGE_MAX_DISTANCE = 25
@@ -77,12 +38,12 @@ USE_GROUND_RANGE = 3
 MAX_PICK_UP_DISTANCE = 3
 
 # COOLDOWNS
-SKILL_COOLDOWN = 3100
-DRAG_COOLDOWN = 260
-USE_COOLDOWN = 3250
-MINING_COOLDOWN = 4200
-BANDAGE_COOLDOWN = 8000
-LOOT_COOLDOWN = 650
+SKILL_COOLDOWN = 3000 + tools.server_ping_average()
+DRAG_COOLDOWN = 250 + tools.server_ping_average()
+USE_COOLDOWN = 3000 + tools.server_ping_average()
+MINING_COOLDOWN = USE_COOLDOWN
+BANDAGE_COOLDOWN = 8000 + tools.server_ping_average()
+LOOT_COOLDOWN = DRAG_COOLDOWN
 
 # WEIGHTS
 WEIGHT_ORE = 12
