@@ -57,7 +57,17 @@ class ScriptBase:
             signal.signal(signal_, self.at_exit)
 
     def at_exit(self):
-        log.info(f"{self} atexit. Script stats:\n{self.script_stats_str}")
+        log.info(f"{self} atexit.")
+        self.print_script_stats()
+
+    def print_script_stats(self):
+        log.info(f"{self} stats:")
+        msg = self.script_stats_str
+        for line in msg.split('\n'):
+            if not line:
+                continue
+
+            log.info(f"  {line}")
 
     def __str__(self):
         return self.name
@@ -85,8 +95,7 @@ class ScriptBase:
         self._commands_cooldown[command] = pendulum.now().add(seconds=cooldown_secs)
 
     def report_stats(self):
-        if self.script_stats:
-            return log.info(f"{self} stats:\n{self.script_stats_str}")
+        self.print_script_stats()
 
     def parse_commands(self):
         journal = tools.journal(start_index=self.commands_journal_index)
@@ -104,7 +113,10 @@ class ScriptBase:
 
     @property
     def script_stats_str(self):
-        return pprint.pformat(self.script_stats, indent=2, width=10)
+        msg = ''
+        for key, value in self.script_stats.items():
+            msg += f'\n{key}: {value}'
+        return msg
 
     @property
     def name(self):
@@ -128,15 +140,15 @@ class ScriptBase:
             self.player.grab(item)
 
     @alive_action
-    def engage_mob(self, mob: Mob, check_health_func=None, loot=True, cut=True, drop_trash_items=True,
-                   notify_only_mutated=True, trash_items=None):
+    def engage_mob(self, mob: Mob, check_health_func=None, loot=False, cut=False, drop_trash_items=True,
+                   notify_only_mutated=not log.verbose, trash_items=None):
         check_health_func = check_health_func or self.check_health
         if not mob.exists:
-            log.info(f"Won't engage nonexisting {mob}")
+            log.debug(f"Won't engage nonexisting {mob}")
             return
 
         if mob.dead:
-            log.info(f"Won't engage dead {mob}")
+            log.debug(f"Won't engage dead {mob}")
             return
 
         # distance = mob.path_distance()  # this is being checked before this function
@@ -161,7 +173,7 @@ class ScriptBase:
         if loot:
             self.player.break_action()
             self.player.loot_nearest_corpse(cut_corpse=cut, drop_trash_items=drop_trash_items)
-            self.drop_trash()
+            self.drop_trash(trash_items=trash_items)
 
     @alive_action
     def drop_trash(self, trash_items=None):
@@ -208,7 +220,7 @@ class ScriptBase:
                 if not drop_object_id:
                     break
 
-                drop_item = Item.instantiate(drop_object_id, color=drop_color, weight=drop_weight)
+                drop_item = Item.instantiate(drop_object_id, color=drop_color, weight=drop_weight, omit_cache=True)
                 if not drop_item.quantity:
                     break
 
@@ -317,9 +329,14 @@ class ScriptBase:
                 tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}')
                 self.player.move(*constants.COORDS_MINOC_HEALER)
                 self.quit()
+
+        if not self.player.got_bandages:
+            return False
+
         need_heal = (self.player.max_hp - self.player.hp) > (self.player.max_hp * 0.4)
         if need_heal:
             if self.player.got_bandages:
+                self.player.break_action()
                 self.player.bandage_self_if_hurt()
                 return True
             else:
@@ -369,40 +386,43 @@ class ScriptBase:
         output = False
         while creatures := self.player.find_creatures(
                 distance=mob_find_distance, notorieties=[constants.Notoriety.Murderer],
-                condition=lambda i: i not in self._processed_mobs and i.exists and not i.mount and not i.human):
+                condition=lambda i: i not in self._processed_mobs
+                                    and i.exists and not i.dead and not i.mount and not i.human):
             for creature in creatures:
-                if creature in self._processed_mobs:
-                    continue
-
                 # noinspection PyProtectedMember
-                mob = Mob.instantiate(creature.id_, path_distance=creature._path_distance)
-                if mob.dead:
+                mob = Mob.instantiate(creature.id_, omit_cache=True)
+                if mob in self._processed_mobs:
+                    log.debug(f"Skipping processed {mob}")
                     continue
 
-                notify = (notify_mutated and mob.mutated) or (
-                            notify_ranged and mob.type_id in constants.TYPE_IDS_MOB_RANGED)
-                if notify:
-                    tools.telegram_message(f"{mob} detected at distance {mob.path_distance()}",
-                                           disable_notification=not mob.mutated)
+                if mob.dead:
+                    log.debug(f"Skipping dead {mob}")
+                    self._processed_mobs.append(mob)
+                    continue
+
+                # notify = (notify_mutated and mob.mutated) or (
+                #             notify_ranged and mob.type_id in constants.TYPE_IDS_MOB_RANGED)
+                mob_path_distance = mob.path_distance()
+                # if notify:
+                #     tools.telegram_message(f"{mob} detected at distance {mob.path_distance()}",
+                #                            disable_notification=not mob.mutated)
                 if engage:
                     # noinspection PyProtectedMember
-                    mob_distance = mob._path_distance  # we already got this
                     max_distance = constants.ENGAGE_MAX_DISTANCE
-                    if mob_distance <= 1:
-                        log.info(f"Already at {mob} at distance path {mob_distance}")
-                    elif mob_distance > max_distance:
-                        msg = f"Won't engage {mob}. Distance path: {mob_distance}, max distance: {max_distance}"
-                        log.info(msg)
-                        tools.telegram_message(msg)
+                    if mob_path_distance <= 1:
+                        log.debug(f"Already at {mob} at distance path {mob_path_distance}")
+                    elif mob_path_distance > max_distance:
+                        msg = f"Won't engage {mob}. Distance path: {mob_path_distance}, max distance: {max_distance}"
+                        log.debug(msg)
+                        # tools.telegram_message(msg)
                     else:
                         if drop_overweight_items:
                             self.drop_overweight_items(drop_overweight_items)
                         self.engage_mob(mob)
-                        if notify:
-                            dead = mob.dead
-                            tools.telegram_message(f"Done engaging {mob}. Dead: {dead}", disable_notification=dead)
+                        # if notify:
+                        #     dead = mob.dead
+                        #     tools.telegram_message(f"Done engaging {mob}. Dead: {dead}", disable_notification=dead)
                         output = True
-                self._processed_mobs.append(creature)
         return output
 
     @alive_action

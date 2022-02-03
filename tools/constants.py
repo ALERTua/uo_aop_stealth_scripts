@@ -54,6 +54,15 @@ WEIGHT_INGOT = 1
 COORDS_MINOC_HEALER = (2572, 585)
 COORDS_MINOC_BANK = (2512, 556)
 
+# NAMES
+MOB_NAMES = [
+    'Drevodriada',
+]
+
+HUMAN_MOB_COLORS = [
+    0x07D6,  # Drevodriada green
+]
+
 # TYPE IDS
 TYPE_ID_CORPSE = 0x2006
 TYPE_ID_HIDE = 0x1078

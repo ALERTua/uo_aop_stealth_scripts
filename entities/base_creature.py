@@ -51,16 +51,25 @@ class Creature(Object):
 
     @property
     def alive(self):
-        return self.hp > 0
+        return IsObjectExists(self._id) and not IsDead(self._id) and self.hp > 0
 
     @property
     def dead(self):
-        return self.hp <= 0
+        return not IsObjectExists(self._id) or IsDead(self._id) or self.hp <= 0
 
     @property
     def human(self):
-        return self.type_id in constants.TYPE_IDS_HUMAN
+        output = self.type_id in constants.TYPE_IDS_HUMAN \
+                 and self.name not in constants.MOB_NAMES \
+                 and self.color not in constants.HUMAN_MOB_COLORS
+        return output
 
     @property
     def mount(self):
         return self.type_id in constants.TYPE_IDS_MOUNT
+
+    def path(self, optimized=True, accuracy=1):
+        return super().path(optimized=optimized, accuracy=accuracy)
+
+    def path_distance(self, optimized=True, accuracy=1):
+        return super().path_distance(optimized=optimized, accuracy=accuracy)

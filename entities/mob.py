@@ -3,7 +3,6 @@ from tools import constants
 from tools.tools import log
 
 
-
 class Mob(Creature):
     def __init__(self, _id, **kwargs):
         super().__init__(_id, **kwargs)

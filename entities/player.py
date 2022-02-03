@@ -201,6 +201,7 @@ class Player(Creature):
                 return False
 
         log.debug(f"Successfuly opened {container}")
+        tools.result_delay()
         return True
 
     @alive_action
@@ -537,6 +538,7 @@ class Player(Creature):
         if cut_corpse:
             self.move_to_object(corpse)
             self.cut_corpse(corpse_id)
+            tools.result_delay()
         self.loot_container(corpse)
         if drop_trash_items:
             # noinspection PyArgumentList
@@ -573,17 +575,17 @@ class Player(Creature):
         log.info(f"Cutting {corpse_or_id}")
         self.use_object_on_object(cutting_tool, corpse)
 
-    def path_to_coords(self, x, y, optimized=True, accuracy=0):
+    def path_to_coords(self, x, y, optimized=True, accuracy=1):  # accuracy must be 1 for creatures
         return GetPathArray(x, y, optimized, accuracy)
 
-    def path_distance_to(self, x, y):
-        return len(self.path_to_coords(x, y))
+    def path_distance_to(self, x, y, optimized=True, accuracy=1):  # accuracy must be 1 for creatures
+        return len(self.path_to_coords(x, y, optimized=optimized, accuracy=accuracy))
 
-    def get_closest_coords(self, coords):
+    def get_closest_coords(self, coords, optimized=True, accuracy=1):
         Coords = namedtuple('Coords', ['x', 'y', 'distance'])
         spots = []
         for spot in coords:
-            coords = Coords(*spot, self.path_distance_to(*spot))
+            coords = Coords(*spot, self.path_distance_to(*spot, optimized=optimized, accuracy=accuracy))
             spots.append(coords)
         spots = sorted(spots, key=lambda i: i.distance)
         closest_spot = spots[0]

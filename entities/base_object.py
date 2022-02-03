@@ -33,8 +33,8 @@ class Object:
         return self.__str__()
 
     @classmethod
-    def _get_cached(cls, id_, *args, **kwargs):
-        if id_ in Object.cache.keys() and Object.cache[id_].__class__ == cls:
+    def _get_cached(cls, id_, omit_cache=False, *args, **kwargs):
+        if not omit_cache and id_ in Object.cache.keys() and Object.cache[id_].__class__ == cls:
             output = Object.cache[id_]
             # log.debug(f"Returning cached {output}")
         else:
@@ -44,14 +44,14 @@ class Object:
         return output
 
     @classmethod
-    def instantiate(cls, obj, *args, **kwargs):
+    def instantiate(cls, obj, omit_cache=False, *args, **kwargs):
         if isinstance(obj, (cls, *cls.__subclasses__())):
             return obj
 
         if isinstance(obj, Object):  # todo: not perfect
-            return cls._get_cached(obj.id_, *args, **kwargs)
+            return cls._get_cached(obj.id_, omit_cache=omit_cache, *args, **kwargs)
 
-        return cls._get_cached(obj, *args, **kwargs)
+        return cls._get_cached(obj, omit_cache=omit_cache, *args, **kwargs)
 
     @property
     def id_(self):
@@ -142,7 +142,8 @@ class Object:
         if self.coords == (0, 0, 0, 0):  # creature coords unknown
             return 99999
 
-        return stealth.Dist(self.player_x, self.player_y, self.x, self.y)
+        output = stealth.Dist(self.player_x, self.player_y, self.x, self.y)
+        return output
 
     def path(self, optimized=True, accuracy=0):
         output = stealth.GetPathArray(self.x, self.y, optimized, accuracy)

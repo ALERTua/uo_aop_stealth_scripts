@@ -221,6 +221,7 @@ class Lumberjack(ScriptBase):
     def tree_depleeted(self):
         log.info(f"{len(self._trees)}/{len(LJ_SPOTS)} Tree depleeted: {self.current_tree}.")
         self.current_tree = None
+        self._processed_mobs = []
 
     def _jack_tree(self, tile_type, x, y, z):
         while self.player.overweight:  # consider near_max_weight
@@ -290,7 +291,7 @@ class Lumberjack(ScriptBase):
         self.lj_i = MAX_LJ_ITERATIONS
 
     def engage_mob(self, mob: Mob, **kwargs):
-        return super().engage_mob(mob=mob, check_health_func=self.lj_check_health, loot=LOOT_CORPSES, cut=CUT_CORPSES,
+        return super().engage_mob(mob=mob, check_health_func=self.lj_check_health, loot=False, cut=False,
                                   drop_trash_items=True, trash_items=LJ_TRASH)
 
     def _checks(self, check_overweight=True, loot_corpses=True):
