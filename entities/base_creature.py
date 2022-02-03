@@ -66,7 +66,7 @@ class Creature(Object):
 
     @property
     def mount(self):
-        return self.type_id in constants.TYPE_IDS_MOUNT
+        return self.type_id in constants.TYPE_IDS_MOUNT or self.name in constants.NAMES_MOUNT
 
     def path(self, optimized=True, accuracy=1):
         return super().path(optimized=optimized, accuracy=accuracy)

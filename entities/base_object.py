@@ -27,7 +27,7 @@ class Object:
             return False
 
     def __str__(self):
-        return f"[{self.__class__.__name__}]({hex(self._id)}){self.name}"
+        return f"[{self.__class__.__name__}]({self.type_id}:{hex(self._id)}){self.name}"
 
     def __repr__(self):
         return self.__str__()
