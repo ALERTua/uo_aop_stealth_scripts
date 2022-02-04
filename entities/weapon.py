@@ -4,7 +4,6 @@ import py_stealth as stealth
 from tools.tools import log
 
 
-
 class Katana(RightHandWeapon):
     def type_id(self):
         return constants.TYPE_ID_KATANA

@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 from entities.item import Item
 import py_stealth as stealth
 
+
 class WeaponBase(Item):
     __metaclass__ = ABCMeta
 
@@ -17,6 +18,10 @@ class WeaponBase(Item):
     @abstractmethod
     def type_id(self):
         raise NotImplementedError()
+
+    @property
+    def equipped(self):
+        return stealth.GetLayer(self.id_) == self.layer
 
 
 class LeftHandWeapon(WeaponBase):

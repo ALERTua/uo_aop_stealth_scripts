@@ -48,6 +48,9 @@ class ScriptBase:
         self._looted_corpses = []
         self._checked_weapons = []
         self.commands_journal_index = stealth.HighJournal()
+        self.loot_container = None
+        self.unload_itemids = []
+        self.tool_typeid = None
         atexit.register(self.at_exit)
 
     def _register_signals(self):
@@ -311,16 +314,86 @@ class ScriptBase:
                     tools.telegram_message("Couldn't resurrect. No rune found @ bank")
                     self.disconnect()
                     quit()
+
         self.move_to_unload()
         self.unload()
 
-    @abstractmethod
-    def move_to_unload(self):
-        raise NotImplemented()
+    def move_to_unload(self, loot_container=None):
+        loot_container = loot_container or self.loot_container
+        self.parse_commands()
+        if self.player.path_distance_to(*loot_container.xy) > 1:
+            log.info("Moving to unload")
+            self.wait_stamina()
+            self.player.move(*loot_container.xy, accuracy=0)
+            log.info("Moving to unload done")
+        tools.ping_delay()
+        self.player.open_container(loot_container)
 
-    @abstractmethod
+    def record_stats(self):
+        pass
+
+    def checks(self):
+        pass
+
+    def move_to_spot_loop(self, spot_x, spot_y):
+        log.debug(f"Entering {tools.get_function_name()}")
+        self.checks()
+        while self.player.distance_to(spot_x, spot_y) > 0:
+            log.info(f"Moving to spot: {spot_x} {spot_y}")
+            self.wait_stamina(5)
+            self.player.move(spot_x, spot_y, accuracy=0, running=self.should_run)
+            self.checks()
+        log.debug(f"Exiting {tools.get_function_name()}")
+
+    def overweight_loop(self):
+        while self.player.overweight:  # consider near_max_weight
+            log.debug(f"Entering {tools.get_function_name()} loop")
+            self.parse_commands()
+            self.check_overweight()
+            if self.player.overweight:
+                coords = self.player.xy
+                self.move_to_unload()
+                self.unload()
+                self.move_to_spot_loop(*coords)
+        log.debug(f"Exiting {tools.get_function_name()} loop")
+
+    def unload_get_tool(self, tool_typeid=None, loot_container=None):
+        tool_typeid = tool_typeid or self.tool_typeid
+        if not tool_typeid:
+            log.critical(f"You should define self.tool_typeid")
+            return
+
+        got_tool = self.player.find_types(tool_typeid)
+        if got_tool:
+            return
+
+        log.debug(f"{tools.get_function_name()}")
+        loot_container = loot_container or self.loot_container
+        container_tool = self.player.find_type(tool_typeid, loot_container)
+        if not container_tool:
+            todo = stealth.GetFindedList()
+            log.info("WARNING! NO SPARE TOOLS FOUND!")
+            tools.telegram_message(f"{self.player}: {self.name}: No tools found: {todo}")
+            self.quit()
+            return
+
+        while not self.player.find_types(tool_typeid) and not self.player.move_item(container_tool):
+            log.info(f"Grabbing Tool {container_tool}")
+            tools.ping_delay()
+        log.debug(f"{tools.get_function_name()} done")
+
     def unload(self):
-        raise NotImplemented()
+        log.info("Unloading")
+        self.move_to_unload()
+        self.record_stats()
+        self.parse_commands()
+        self.player.unload_types(self.unload_itemids, self.loot_container)
+        self.unload_get_tool()
+        self.check_bandages()
+        self.rearm_from_container()
+        self.eat()
+        self._processed_mobs = []
+        self.report_stats()
 
     def check_health(self, resurrect=False):
         if self.player.dead:

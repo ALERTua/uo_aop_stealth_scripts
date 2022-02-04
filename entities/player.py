@@ -189,7 +189,7 @@ class Player(Creature):
         if self.last_container == container and not container.is_empty:
             return True
 
-        self.use_object(container)
+        self._use_object(container)  # without the cooldown
         for _ in range(1):  # double check result
             tools.result_delay()
             if self.last_container == container:
@@ -212,6 +212,8 @@ class Player(Creature):
             if i >= max_tries:
                 log.info(f"Couldn't open {container} after {max_tries} tries")
                 return False
+
+            tools._delay(constants.USE_COOLDOWN)
 
         log.debug(f"Successfuly opened {container}")
         tools.result_delay()
@@ -326,6 +328,9 @@ class Player(Creature):
 
     @use_cd
     def use_object(self, obj, announce=True):
+        return self._use_object(obj=obj, announce=announce)
+
+    def _use_object(self, obj, announce=True):
         obj = Object.instantiate(obj)
         if obj.id_ in (0, None, -1):
             log.info(f"Cannot use {obj}")
@@ -353,8 +358,9 @@ class Player(Creature):
         obj = Object.instantiate(obj)
         log.info(f"Using {obj} on tile {tile_type}:({x}, {y}, {z})")
         CancelWaitTarget()
-        self.use_object(obj, announce=False)
+        output = self.use_object(obj, announce=False)
         WaitTargetTile(tile_type, x, y, z)
+        return output
 
     @property
     def max_weight(self):

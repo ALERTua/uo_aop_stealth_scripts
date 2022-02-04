@@ -1,5 +1,7 @@
 import inspect
 import os
+import traceback
+
 import requests
 from datetime import datetime
 from typing import List
@@ -39,6 +41,10 @@ def debug(ip=None):
 DEBUG = True
 if DEBUG:
     debug() or debug('192.168.1.2')
+
+
+def get_function_name():
+    return traceback.extract_stack(None, 2)[0][2]
 
 
 def get_prev_function_name():

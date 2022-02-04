@@ -104,6 +104,7 @@ class Lumberjack(ScriptBase):
         self._trees = []
         self._current_tree = None
         self.lj_i = 0
+        self.unload_itemids = LJ_LOOT
         self.drop_types = [
             (constants.TYPE_ID_LOGS, constants.COLOR_LOGS_S, constants.WEIGHT_LOGS),
             (constants.TYPE_ID_LOGS, -1, constants.WEIGHT_LOGS),
@@ -132,7 +133,7 @@ class Lumberjack(ScriptBase):
         return self.hatchet.exists
 
     def pick_up_items(self, **kwargs):
-        return super().pick_up_items(LJ_LOOT)
+        return super().pick_up_items(self.unload_itemids)
 
     def process_mobs(self, **kwargs):
         return super().process_mobs(engage=ENGAGE_MOBS, notify_mutated=True, mob_find_distance=MOB_FIND_DISTANCE,
@@ -147,7 +148,7 @@ class Lumberjack(ScriptBase):
             self.player.move(x, y, accuracy=LJ_DISTANCE_TO_TREE, running=self.should_run)
             self._checks()
 
-    def move_to_unload(self):
+    def move_to_unload(self, **kwargs):
         self.parse_commands()
         if self.player.path_distance_to(*self.loot_container.xy) > 1:
             log.info("Moving to unload")
@@ -190,7 +191,7 @@ class Lumberjack(ScriptBase):
         return super().eat(container_id=self.loot_container)
 
     def count_logs(self, recursive=True):
-        logs = self.player.find_types_backpack(type_ids=LJ_LOOT, recursive=recursive)
+        logs = self.player.find_types_backpack(type_ids=self.unload_itemids, recursive=recursive)
         if not logs:
             return
 
@@ -210,7 +211,7 @@ class Lumberjack(ScriptBase):
         self.move_to_unload()
         self.count_logs()
         self.parse_commands()
-        self.player.unload_types(LJ_LOOT, self.loot_container)
+        self.player.unload_types(self.unload_itemids, self.loot_container)
         self.check_hatchet()
         self.check_bandages()
         self.rearm_from_container()
