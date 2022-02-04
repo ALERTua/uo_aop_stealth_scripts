@@ -1,7 +1,7 @@
 from collections import namedtuple
 from collections.abc import Iterable
 from copy import copy
-from functools import wraps
+from functools import wraps, lru_cache
 from typing import List
 
 import pendulum
@@ -166,6 +166,19 @@ class Player(Creature):
         while self.mounted:
             # noinspection PyArgumentList
             self._use_self()
+
+    @lru_cache
+    def _set_dress_speed(self):
+        SetDressSpeed(constants.DRAG_COOLDOWN)
+
+    @alive_action
+    def save_dress_set(self):
+        SetDress()
+
+    @alive_action
+    def dress_set(self):
+        self._set_dress_speed()
+        EquipDressSet()
 
     @alive_action
     def open_backpack(self):
@@ -431,7 +444,8 @@ class Player(Creature):
 
     @alive_action
     def find_type_backpack(self, type_id, color_id=None, recursive=True):
-        color_id = color_id or -1
+        if color_id is None:
+            color_id = -1
         return FindTypeEx(type_id, color_id, self.backpack.id_, recursive)
 
     def got_item_type(self, item_type, color_id=None):
@@ -501,7 +515,8 @@ class Player(Creature):
                         items_color=None, x=0, y=0, z=0, delay=None):
         if not isinstance(item_types, Iterable):
             item_types = [item_types]
-        items_color = items_color or -1
+        if items_color is None:
+            items_color = -1
         source_container = Container.instantiate(source_container) if source_container else self.backpack
         destination_container = destination_container or Ground()
         destination_container = Container.instantiate(destination_container)

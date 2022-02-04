@@ -84,7 +84,7 @@ class Object:
 
     @property
     def exists(self):
-        return stealth.IsObjectExists(self._id) and self.type_id
+        return all((stealth.IsObjectExists(self._id), self.type_id))
 
     def _get_name(self):
         output = stealth.GetName(self._id)
@@ -157,7 +157,7 @@ class Object:
             return 99999
 
         output = self.path(optimized=optimized, accuracy=accuracy)
-        if self.exists and len(output) == 0 and self.x != self.player_x and self.y != self.player_y:
+        if self.exists and len(output) == 0 and (self.x != self.player_x or self.y != self.player_y):
             return 99999  # cannot build path to the creature
 
         self._path_distance = len(output)

@@ -181,8 +181,11 @@ class ScriptBase:
         return self.player.drop_trash_items(trash_items)
 
     @alive_action
-    def loot_corpses(self, drop_trash_items=True, trash_items=None, cut_corpses=True):
-        corpses = [Container.instantiate(i) for i in self.player.find_types_ground(constants.TYPE_ID_CORPSE)]
+    def loot_corpses(self, drop_trash_items=True, trash_items=None, cut_corpses=True, corpse_find_distance=2):
+        corpses = [
+            Container.instantiate(i)
+            for i in self.player.find_types_ground(constants.TYPE_ID_CORPSE, distance=corpse_find_distance)
+        ]
         for corpse in corpses:
             if corpse in self._looted_corpses:
                 continue

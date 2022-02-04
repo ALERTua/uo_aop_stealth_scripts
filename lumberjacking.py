@@ -23,7 +23,8 @@ EQUIP_WEAPONS_FROM_GROUND = True
 EQUIP_WEAPONS_FROM_LOOT_CONTAINER = True
 RESET_PROCESSED_MOBS_ON_UNLOAD = True
 MAX_WEAPON_SEARCH_DISTANCE = 20
-MAX_LJ_ITERATIONS = 2
+CORPSE_FIND_DISTANCE = 20
+MAX_LJ_ITERATIONS = 3
 LJ_DISTANCE_TO_TREE = 1
 LJ_CONTAINER_ID = 0x728F3B3B
 LJ_CONTAINER_COORDS = (2470, 182)
@@ -352,7 +353,8 @@ class Lumberjack(ScriptBase):
 
     @condition(LOOT_CORPSES)
     def loot_corpses(self, **kwargs):
-        return super().loot_corpses(cut_corpses=CUT_CORPSES, trash_items=LJ_TRASH)
+        return super().loot_corpses(cut_corpses=CUT_CORPSES, trash_items=LJ_TRASH,
+                                    corpse_find_distance=CORPSE_FIND_DISTANCE)
 
     def drop_trash(self, **kwargs):
         return super(Lumberjack, self).drop_trash(trash_items=LJ_TRASH)
