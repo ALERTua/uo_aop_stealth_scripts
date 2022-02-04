@@ -1,5 +1,6 @@
 import inspect
 import os
+import requests
 from datetime import datetime
 from typing import List
 import ping3
@@ -81,10 +82,14 @@ def telegram_message(msg, chat_id=None, disable_notification=False, token=None):
     if not chat_id:
         return
 
-    disable_notification = str(disable_notification).lower()
-    cmd = f'curl -X POST "https://api.telegram.org/{token}/sendMessage" -d chat_id={chat_id} ' \
-          f'-d disable_notification={disable_notification} -d text="{msg}"'
-    return os.system(cmd)
+    data = {
+        'text': msg,
+        'chat_id': chat_id,
+        'parse_mode': 'markdown',
+        'disable_notification': disable_notification
+    }
+    url = f'https://api.telegram.org/{token}/sendMessage'
+    return requests.post(url=url, json=data)
 
 
 def _delay(delay=250):
