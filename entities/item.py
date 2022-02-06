@@ -1,4 +1,5 @@
 from .base_object import Object, stealth
+import py_stealth as stealth
 from tools.tools import log
 
 
@@ -14,7 +15,8 @@ class Item(Object):
     def name(self):
         if self._name is None:
             self._name = self._get_name()
-            if self._id != 0 and not self._name:  # clickonobject doesn't work on id 0
+            if not self._name and self._id not in (0, stealth.RhandLayer(), stealth.LhandLayer()):
+                # clickonobject doesn't work on id 0
                 stealth.ClickOnObject(self._id)
                 self._name = self._get_name()
         return self._name
@@ -31,10 +33,6 @@ class Item(Object):
 
         short_name = name.split(':')[0].strip()
         return short_name
-
-    @property
-    def quantity(self):
-        return stealth.GetQuantity(self._id)
 
     @property
     def total_weight(self):

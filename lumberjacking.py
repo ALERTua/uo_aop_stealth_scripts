@@ -105,6 +105,7 @@ class Lumberjack(ScriptBase):
         self._current_tree = None
         self.lj_i = 0
         self.unload_itemids = LJ_LOOT
+        self.trash_item_ids = LJ_TRASH
         self.drop_types = [
             (constants.TYPE_ID_LOGS, constants.COLOR_LOGS_S, constants.WEIGHT_LOGS),
             (constants.TYPE_ID_LOGS, -1, constants.WEIGHT_LOGS),
@@ -184,7 +185,7 @@ class Lumberjack(ScriptBase):
 
         return True
 
-    def check_bandages(self):
+    def check_bandages(self, **kwargs):
         return self._check_bandages(HOLD_BANDAGES, self.loot_container)
 
     def eat(self, **kwargs):
@@ -206,7 +207,7 @@ class Lumberjack(ScriptBase):
                 self.script_stats[entry_name] = 0
             self.script_stats[entry_name] += log_quantity
 
-    def unload(self):
+    def unload(self, **kwargs):
         log.info("Unloading")
         self.move_to_unload()
         self.count_logs()
@@ -262,7 +263,7 @@ class Lumberjack(ScriptBase):
         return output
 
     def check_overweight(self, **kwargs):
-        return super().check_overweight(self.drop_types)
+        return super().check_overweight(self.drop_types, self.trash_item_ids)
 
     def go_woods(self):
         self.check_overweight()
@@ -358,7 +359,7 @@ class Lumberjack(ScriptBase):
                                     corpse_find_distance=CORPSE_FIND_DISTANCE)
 
     def drop_trash(self, **kwargs):
-        return super(Lumberjack, self).drop_trash(trash_items=LJ_TRASH)
+        return super(Lumberjack, self).drop_trash(trash_items=self.trash_item_ids)
 
     @condition(EQUIP_WEAPONS_FROM_GROUND)
     def check_weapon(self, **kwargs):

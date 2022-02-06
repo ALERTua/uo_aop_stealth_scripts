@@ -19,6 +19,9 @@ class Object:
         self._z = z
         self.fixed_coords = fixed_coords
 
+    def __hash__(self):
+        return self._id
+
     def __eq__(self, other):
         try:
             output = (self.__class__ == other.__class__) and (self.id_ == other.id_)
@@ -217,3 +220,7 @@ class Object:
 
     def hide(self):
         return stealth.ClientHide(self.id_)  # never gets the result and hangs forever
+
+    @property
+    def quantity(self):
+        return stealth.GetQuantity(self.id_)

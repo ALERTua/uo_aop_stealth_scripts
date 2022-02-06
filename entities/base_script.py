@@ -1,15 +1,16 @@
 import atexit
-import pprint
 import signal
-from abc import abstractmethod
 from copy import copy
 from functools import wraps
+from typing import Iterable
 
 import pendulum
 
 import py_stealth as stealth
 from tools import constants, tools
 from tools.tools import log
+from .base_creature import Creature
+from .base_weapon import WeaponBase, GenericWeapon
 from .container import Container
 from .item import Item
 from .mob import Mob
@@ -17,7 +18,7 @@ from .player import Player, alive_action
 
 BANK_COORDS = (2512, 556)
 HEALER_COORDS = constants.COORDS_MINOC_HEALER
-BANK_ID = 0x7277EC74
+
 
 
 def condition(condition_):
@@ -49,8 +50,10 @@ class ScriptBase:
         self._checked_weapons = []
         self.commands_journal_index = stealth.HighJournal()
         self.loot_container = None
-        self.unload_itemids = []
+        self.unload_itemids = constants.TYPE_IDS_LOOT
         self.tool_typeid = None
+        self.trash_item_ids = constants.ITEM_IDS_TRASH
+        self._hold_bandages = 2
         atexit.register(self.at_exit)
 
     def _register_signals(self):
@@ -137,14 +140,67 @@ class ScriptBase:
         log.info(f"Stamina reached {threshold}")
 
     @alive_action
-    def pick_up_items(self, type_ids):
+    def pick_up_items(self, type_ids=None):
+        type_ids = type_ids or self.unload_itemids
         found_items = self.player.find_types_ground(type_ids, distance=constants.MAX_PICK_UP_DISTANCE)
-        for item in found_items:
-            self.player.grab(item)
+        if found_items:
+            for item in found_items:
+                self.player.grab(item)
+
+    @alive_action
+    def engage_mob_loop(self,  mob: Mob, check_health_func, ranged=False, ranged_weapon: WeaponBase = None,
+                        ranged_unmount=True, ranged_keep_distance=8):
+        equipped_weapons = []
+        rearm = False
+        remount = False
+        if ranged:
+            if not isinstance(ranged_weapon, WeaponBase):
+                ranged_weapon = GenericWeapon.instantiate(ranged_weapon)
+        while mob.alive:
+            # noinspection PyProtectedMember
+            if self.player._mount == mob.id_:
+                break
+
+            if ranged:
+                self.player.keep_away(mob.x, mob.y, ranged_keep_distance, accuracy=0, running=None)
+                if ranged_unmount and self.player.mounted:
+                    # noinspection PyProtectedMember
+                    self.player._mount = self.player._mount or stealth.ObjAtLayer(stealth.HorseLayer())
+                    self.player.dismount()
+                    tools.result_delay()
+                    self.player.say('all follow me')
+                    remount = True
+
+                if ranged_weapon.id_ not in self.player.equipped_weapons:
+                    equipped_weapons = equipped_weapons or self.player.equipped_weapons
+                    self.player.disarm()
+                    self.player.equip_weapon_id(ranged_weapon)
+                    rearm = True
+
+            else:
+                if mob.distance > 1:
+                    self.player.move(mob.x, mob.y)
+                else:
+                    log.debug(f"Won't engage {mob} that is already at distance {mob.distance}")
+            check_health_func()  # script_check_health in scripts
+            self.player.attack(mob.id_)
+        if remount and self.player.unmounted:
+            # noinspection PyProtectedMember
+            mount = Creature.instantiate(self.player._mount)
+            self.player.move_to_object(mount)
+            self.player.use_object(mount)
+
+        if rearm:
+            self.player.disarm()
+            for weapon in equipped_weapons:
+                if weapon:
+                    self.player.equip_weapon_id(weapon)
+        self.player.war_mode = False
 
     @alive_action
     def engage_mob(self, mob: Mob, check_health_func=None, loot=False, cut=False, drop_trash_items=True,
-                   notify_only_mutated=not log.verbose, trash_items=None):
+                   notify_only_mutated=not log.verbose, trash_items=None, ranged=False,
+                   ranged_weapon: WeaponBase = None, ranged_unmount=True, ranged_keep_distance=8):
         check_health_func = check_health_func or self.check_health
         if not mob.exists:
             log.debug(f"Won't engage nonexisting {mob}")
@@ -162,29 +218,29 @@ class ScriptBase:
         log.info(f"Engaging {mob.hp}/{mob.max_hp} {mob} at distance {mob.distance}")
         if mob.mutated:
             stealth.Alarm()
-        while mob.alive:
-            if mob.distance > 1:
-                self.player.move(mob.x, mob.y)
-                self.player.attack(mob.id_)
-            else:
-                log.info(f"Won't engage {mob} that is already at distance {mob.distance}")
-            check_health_func()  # script_check_health in scripts
+
+        self.engage_mob_loop(mob, check_health_func=check_health_func, ranged=ranged, ranged_weapon=ranged_weapon,
+                             ranged_unmount=ranged_unmount, ranged_keep_distance=ranged_keep_distance)
         log.info(f"Done Engaging {mob}")
         self.player.war_mode = False
         if not notify_only_mutated or (notify_only_mutated and mob.mutated):
             tools.telegram_message(f"{mob} dead", disable_notification=not mob.mutated)
         if loot:
             self.player.break_action()
-            self.player.loot_nearest_corpse(cut_corpse=cut, drop_trash_items=drop_trash_items)
+            range_ = constants.USE_GROUND_RANGE
+            if ranged:
+                range_ = ranged_keep_distance + 1
+            self.player.loot_nearest_corpse(cut_corpse=cut, drop_trash_items=drop_trash_items, range_=range_)
             self.drop_trash(trash_items=trash_items)
 
     @alive_action
     def drop_trash(self, trash_items=None):
-        trash_items = trash_items or constants.ITEM_IDS_TRASH
+        trash_items = trash_items or self.trash_item_ids
         return self.player.drop_trash_items(trash_items)
 
     @alive_action
     def loot_corpses(self, drop_trash_items=True, trash_items=None, cut_corpses=True, corpse_find_distance=2):
+        trash_items = trash_items or self.trash_item_ids
         corpses = [
             Container.instantiate(i)
             for i in self.player.find_types_ground(constants.TYPE_ID_CORPSE, distance=corpse_find_distance)
@@ -199,12 +255,14 @@ class ScriptBase:
         self.player.drop_trash_items(trash_item_ids=trash_items)
 
     @alive_action
-    def check_overweight(self, drop_types=None):
+    def check_overweight(self, drop_types=None, trash_items=None):
         if not self.player.overweight:  # consider near_max_weight
             return
 
+        drop_types = drop_types or self.unload_itemids
+        trash_items = trash_items or self.trash_item_ids
         self.player.break_action()
-        self.drop_trash()
+        self.drop_trash(trash_items=trash_items)
         self.drop_overweight_items(drop_types=drop_types)
 
     @alive_action
@@ -277,7 +335,7 @@ class ScriptBase:
             if self.player.xy != BANK_COORDS:
                 log.info(f"Moving to bank @ {BANK_COORDS}")
                 self.player.move(*BANK_COORDS, accuracy=0)
-            bank = Container.instantiate(BANK_ID)
+            bank = self.player.bank_container
             if bank.is_empty:
                 log.info(f"Opening bank")
                 self.player.say('bank')
@@ -321,74 +379,106 @@ class ScriptBase:
     def move_to_unload(self, loot_container=None):
         loot_container = loot_container or self.loot_container
         self.parse_commands()
-        if self.player.path_distance_to(*loot_container.xy) > 1:
+        if self.player.distance_to(*loot_container.xy) > 1 or self.player.path_distance_to(*loot_container.xy) > 1:
             log.info("Moving to unload")
             self.wait_stamina()
-            self.player.move(*loot_container.xy, accuracy=0)
-            log.info("Moving to unload done")
+            result = self.player.move_to_object(loot_container, accuracy=0, running=self.should_run)
+            log.info(f"Moving to unload result: {result}")
         tools.ping_delay()
         self.player.open_container(loot_container)
 
     def record_stats(self):
         pass
 
-    def checks(self):
+    def checks(self, break_action=True):
         pass
 
-    def move_to_spot_loop(self, spot_x, spot_y):
+    def move_to_spot_loop(self, spot_x, spot_y, accuracy=0):
         log.debug(f"Entering {tools.get_function_name()}")
-        self.checks()
-        while self.player.distance_to(spot_x, spot_y) > 0:
+        # self.checks(break_action=False)
+        self.overweight_loop()
+        i = 0
+        while self.player.distance_to(spot_x, spot_y) > accuracy:
+            i += 1
+            if i > 10:
+                log.warning(f"Failed to reach {spot_x}, {spot_y} with accuracy {accuracy} in {i} tries")
+                break
+
             log.info(f"Moving to spot: {spot_x} {spot_y}")
             self.wait_stamina(5)
-            self.player.move(spot_x, spot_y, accuracy=0, running=self.should_run)
+            if not self.player.move(spot_x, spot_y, accuracy=accuracy, running=self.should_run):
+                self.player.move(spot_x, spot_y, accuracy=accuracy + 1, running=self.should_run)
             self.checks()
         log.debug(f"Exiting {tools.get_function_name()}")
 
+    def unload_and_return(self):
+        pass
+
     def overweight_loop(self):
+        entered = False
+        if self.player.overweight:
+            log.debug(f"Entering {tools.get_function_name()}")
+            entered = True
         while self.player.overweight:  # consider near_max_weight
-            log.debug(f"Entering {tools.get_function_name()} loop")
             self.parse_commands()
             self.check_overweight()
             if self.player.overweight:
-                coords = self.player.xy
-                self.move_to_unload()
-                self.unload()
-                self.move_to_spot_loop(*coords)
-        log.debug(f"Exiting {tools.get_function_name()} loop")
+                self.unload_and_return()
+        if entered:
+            log.debug(f"Exiting {tools.get_function_name()}")
 
-    def unload_get_tool(self, tool_typeid=None, loot_container=None):
-        tool_typeid = tool_typeid or self.tool_typeid
-        if not tool_typeid:
-            log.critical(f"You should define self.tool_typeid")
-            return
-
-        got_tool = self.player.find_types(tool_typeid)
-        if got_tool:
+    def _unload_get_item(self, typeid, loot_container=None, quantity=1, colors=None, condition: callable = None):
+        if not isinstance(typeid, Iterable):
+            typeid = [typeid]
+        got_item = self.player.find_types_character(typeid)
+        got_item = [Item.instantiate(i) for i in got_item]
+        if got_item and got_item[0].quantity >= quantity:
             return
 
         log.debug(f"{tools.get_function_name()}")
         loot_container = loot_container or self.loot_container
-        container_tool = self.player.find_type(tool_typeid, loot_container)
-        if not container_tool:
+        container_items = self.player.find_types(types=typeid, container_ids=loot_container, colors=colors)
+
+        if not container_items:
             todo = stealth.GetFindedList()
-            log.info("WARNING! NO SPARE TOOLS FOUND!")
-            tools.telegram_message(f"{self.player}: {self.name}: No tools found: {todo}")
+            log.info(f"WARNING! NO SPARE {typeid} FOUND!")
+            tools.telegram_message(f"{self.player}: {self.name}: No {typeid} found: {todo}")
             self.quit()
             return
 
-        while not self.player.find_types(tool_typeid) and not self.player.move_item(container_tool):
-            log.info(f"Grabbing Tool {container_tool}")
+        container_items = [Item.instantiate(i) for i in container_items]
+        container_items.sort(key=lambda i: typeid.index(i.type_id) and (condition(i) if condition else True))
+        container_item = container_items[0]
+        loot_quantity = quantity
+        if got_item and quantity > 1 and got_item[0].quantity < quantity:
+            loot_quantity = quantity - got_item[0].quantity
+            loot_quantity = min((container_item.quantity, loot_quantity))
+
+        while not self.player.got_item_quantity(typeid, quantity) \
+                and not self.player.move_item(container_item, quantity=loot_quantity):
+            log.info(f"Grabbing {loot_quantity}×{container_item}")
             tools.ping_delay()
         log.debug(f"{tools.get_function_name()} done")
 
-    def unload(self):
+    def unload_get_tool(self, tool_typeid=None, loot_container=None):
+        tool_typeid = tool_typeid or self.tool_typeid
+        return self._unload_get_item(typeid=tool_typeid, loot_container=loot_container)
+
+    def unload_get_weapon(self):
+        pass
+
+    def unload(self, item_ids=None, container=None, drink_trash_potions=True):
+        item_ids = item_ids or self.unload_itemids
+        container = container or self.loot_container
         log.info("Unloading")
         self.move_to_unload()
         self.record_stats()
         self.parse_commands()
-        self.player.unload_types(self.unload_itemids, self.loot_container)
+        if drink_trash_potions:
+            self.drink_trash_potions()
+        self.player.unload_types(item_ids, container)
         self.unload_get_tool()
+        self.unload_get_weapon()
         self.check_bandages()
         self.rearm_from_container()
         self.eat()
@@ -422,7 +512,12 @@ class ScriptBase:
 
     @alive_action
     def got_bandages(self, quantity):
-        return stealth.GetQuantity(self.player.find_type_backpack(constants.TYPE_ID_BANDAGE)) == quantity
+        return self.player.got_item_quantity(constants.TYPE_ID_BANDAGE, quantity)
+
+    def check_bandages(self, hold_bandages=None, container=None):
+        hold_bandages = hold_bandages or self._hold_bandages
+        container = container or self.loot_container
+        return self._unload_get_item(constants.TYPE_ID_BANDAGE, container, quantity=hold_bandages)
 
     @alive_action
     def _check_bandages(self, quantity, container_id):
@@ -443,7 +538,8 @@ class ScriptBase:
                 tools.ping_delay()
 
     @alive_action
-    def eat(self, container_id, food_type=None):
+    def eat(self, container_id=None, food_type=None):
+        container_id = container_id or self.loot_container
         food_type = food_type or constants.TYPE_ID_FOOD_FISHSTEAKS
         self.player.open_container(container_id)
         log.info("Eating")
@@ -456,19 +552,33 @@ class ScriptBase:
         food = Item.instantiate(food)
         self.player.use_object(food)
 
+    def _find_mobs(self, mob_find_distance=20, notorieties=None, creature_types=None, path_distance=True):
+        output = self.player.find_creatures(
+            distance=mob_find_distance, notorieties=notorieties, creature_types=creature_types,
+            condition=lambda i: i.type_id is not None and i not in self._processed_mobs and not i.dead and not i.mount
+                                and not i.human,
+            path_distance=path_distance)
+        return output
+
     @alive_action
-    def process_mobs(self, engage=True, notify_mutated=True, notify_ranged=True, notify_errors=True,
-                     mob_find_distance=20, drop_overweight_items=None):
+    def process_mobs(self, engage=True, notify_mutated=True, notify_ranged=True, notify_errors=True, loot=True,
+                     mob_find_distance=20, drop_overweight_items=None, ranged=False, check_health_func=None, cut=True,
+                     ranged_weapon: WeaponBase = None, ranged_unmount=True, ranged_keep_distance=8, path_distance=True,
+                     drop_trash_items=True, trash_items=None, creature_types=None, notorieties=None):
         output = False
-        while creatures := self.player.find_creatures(
-                distance=mob_find_distance, notorieties=[constants.Notoriety.Murderer],
-                condition=lambda i: i not in self._processed_mobs
-                                    and i.exists and not i.dead and not i.mount and not i.human):
+        notorieties = [constants.Notoriety.Murderer] if notorieties is None else notorieties
+        while creatures := self._find_mobs(mob_find_distance=mob_find_distance, notorieties=notorieties,
+                                           creature_types=creature_types, path_distance=path_distance):
             for creature in creatures:
                 # noinspection PyProtectedMember
                 mob = Mob.instantiate(creature.id_, omit_cache=True)
                 if mob in self._processed_mobs:
                     log.debug(f"Skipping processed {mob}")
+                    continue
+
+                # noinspection PyProtectedMember
+                if mob.type_id is None or mob.id_ == self.player._mount:
+                    self._processed_mobs.append(mob)
                     continue
 
                 if mob.dead:
@@ -479,22 +589,26 @@ class ScriptBase:
                 # notify = (notify_mutated and mob.mutated) or (
                 #             notify_ranged and mob.type_id in constants.TYPE_IDS_MOB_RANGED)
                 mob_path_distance = mob.path_distance()
+                mob_distance = mob.distance
                 # if notify:
                 #     tools.telegram_message(f"{mob} detected at distance {mob.path_distance()}",
                 #                            disable_notification=not mob.mutated)
                 if engage:
                     # noinspection PyProtectedMember
                     max_distance = constants.ENGAGE_MAX_DISTANCE
-                    if mob_path_distance <= 1:
+                    if not ranged and mob_path_distance <= 1:
                         log.debug(f"Already at {mob} at distance path {mob_path_distance}")
-                    elif mob_path_distance > max_distance:
+                    elif mob_distance > max_distance and mob_path_distance > max_distance:
                         msg = f"Won't engage {mob}. Distance path: {mob_path_distance}, max distance: {max_distance}"
                         log.debug(msg)
                         # tools.telegram_message(msg)
                     else:
                         if drop_overweight_items:
                             self.drop_overweight_items(drop_overweight_items)
-                        self.engage_mob(mob)
+                        self.engage_mob(mob, check_health_func=check_health_func, loot=loot, cut=cut,
+                                        drop_trash_items=drop_trash_items, notify_only_mutated=notify_mutated,
+                                        trash_items=trash_items, ranged=ranged, ranged_weapon=ranged_weapon,
+                                        ranged_unmount=ranged_unmount, ranged_keep_distance=ranged_keep_distance)
                         # if notify:
                         #     dead = mob.dead
                         #     tools.telegram_message(f"Done engaging {mob}. Dead: {dead}", disable_notification=dead)
@@ -506,6 +620,7 @@ class ScriptBase:
         if self.player.weapon_equipped:
             return
 
+        container_id = container_id or self.loot_container
         container = Container.instantiate(container_id)
         log.info(f"Rearming from {container}")
         weapon_type_ids = weapon_type_ids or constants.TYPE_IDS_WEAPONS
@@ -587,3 +702,12 @@ class ScriptBase:
             return True
 
         return self.player.near_max_weight is False and self.player.stamina > 10
+
+    def drink_trash_potions(self):
+        trash_potions_type_id = constants.TYPE_IDS_POTIONS_TRASH
+        while trash_potions := self.player.find_types_character(trash_potions_type_id):
+            for potion in trash_potions:
+                potion_object = Item.instantiate(potion)
+                log.info(f"Drinking trash potion {potion_object}")
+                self.player._use_object(potion_object)
+                tools._delay(constants.POTION_COOLDOWN)

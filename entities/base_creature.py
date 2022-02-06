@@ -50,6 +50,10 @@ class Creature(Object):
         return ObjAtLayerEx(HorseLayer(), self._id)
 
     @property
+    def unmounted(self):
+        return not self.mounted
+
+    @property
     def alive(self):
         return IsObjectExists(self._id) and not IsDead(self._id) and self.hp > 0
 

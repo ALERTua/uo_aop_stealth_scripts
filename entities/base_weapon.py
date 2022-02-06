@@ -1,4 +1,7 @@
+import re
 from abc import ABCMeta, abstractmethod
+from functools import cached_property
+
 from entities.item import Item
 import py_stealth as stealth
 
@@ -23,8 +26,22 @@ class WeaponBase(Item):
     def equipped(self):
         return stealth.GetLayer(self.id_) == self.layer
 
+    @cached_property
+    def magic(self):
+        magic_patterns = [
+            r'.* of .*',
+            r'.*magic .*',
+        ]
+        name = self.name
+        for pattern in magic_patterns:
+            if re.match(pattern, name, re.I):
+                return True
+
+        return False
+
 
 class LeftHandWeapon(WeaponBase):
+    @property
     def layer(self):
         return stealth.LhandLayer()
 
@@ -35,6 +52,7 @@ class LeftHandWeapon(WeaponBase):
 
 
 class RightHandWeapon(WeaponBase):
+    @property
     def layer(self):
         return stealth.RhandLayer()
 
@@ -42,3 +60,8 @@ class RightHandWeapon(WeaponBase):
     @abstractmethod
     def type_id(self):
         raise NotImplementedError()
+
+
+class GenericWeapon(RightHandWeapon):
+    def type_id(self):
+        return stealth.GetType(self.id_)

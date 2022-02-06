@@ -1,7 +1,9 @@
 import inspect
+import math
 import os
 import traceback
 
+import numpy as np
 import requests
 from datetime import datetime
 from typing import List
@@ -91,7 +93,7 @@ def telegram_message(msg, chat_id=None, disable_notification=False, token=None):
     data = {
         'text': msg,
         'chat_id': chat_id,
-        'parse_mode': 'markdown',
+        'parse_mode': 'html',
         'disable_notification': disable_notification
     }
     url = f'https://api.telegram.org/{token}/sendMessage'
@@ -172,6 +174,21 @@ def server_ping_average(ip=None, iterations=5, singleton=True):
     output = _ping_average(_ip=ip, _iterations=iterations)
     log.debug(f"Returning server IP {ip} {iterations} pings average: {output}")
     return output
+
+
+def circle_points(start_x, start_y, radius, angle_step=30):
+    for angle in range(0, 360, angle_step):
+        angle_rad = angle * math.pi / 180
+        x = start_x + radius * math.cos(angle_rad)
+        y = start_y + radius * math.sin(angle_rad)
+        yield int(x), int(y)
+
+
+def coords_array_closest(starting_coords, coords_array):
+    coords = np.asarray(coords_array)
+    deltas = coords - starting_coords
+    dist_2 = np.einsum('ij,ij->i', deltas, deltas)
+    return dist_2.argsort()
 
 
 def __main():
