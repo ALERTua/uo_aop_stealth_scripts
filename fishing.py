@@ -71,6 +71,11 @@ ERRORS_TOO_MUCH_FISH = [
 ]
 
 FISHING_TRASH = [
+    0x0FC7,
+    0x0FC6,
+    0x0EA8,
+    0x0EA4,
+    0x0EA1,
     0x0EA7,
     0x0EA2,
     0x0EA5,
@@ -262,11 +267,12 @@ class Fishing(ScriptBase):
 
     def tile_depleeted(self):
         self._processed_mobs = []
+        self.wait_stamina(25)
 
     def cut_fish(self, search_distance=constants.USE_GROUND_RANGE):
         cutting_tool = self.player.corpse_cutting_tool
         if not cutting_tool:
-            pass  # todo:
+            return  # todo:
 
         fish = self.player.find_types_ground(constants.TYPE_IDS_FISH, distance=search_distance)
         for fish_item in fish:

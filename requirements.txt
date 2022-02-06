@@ -2,3 +2,4 @@ pendulum
 global-logger
 ping3
 requests
+numpy
