@@ -502,7 +502,7 @@ class ScriptBase:
         need_heal = (self.player.max_hp - self.player.hp) > (self.player.max_hp * 0.4)
         if need_heal:
             if self.player.got_bandages:
-                self.player.break_action()
+                # self.player.break_action()
                 self.player.bandage_self_if_hurt()
                 return True
             else:
