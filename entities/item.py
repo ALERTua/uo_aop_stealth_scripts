@@ -1,5 +1,6 @@
+from entities.journal_line import LineColor
 from .base_object import Object, stealth
-import py_stealth as stealth
+from tools import constants, tools
 from tools.tools import log
 
 
@@ -10,29 +11,6 @@ class Item(Object):
 
     def __str__(self):
         return f"[{self.__class__.__name__}]({hex(self._id)}){self.quantity}×{self.name}"
-
-    @property
-    def name(self):
-        if self._name is None:
-            self._name = self._get_name()
-            if not self._name and self._id not in (0, stealth.RhandLayer(), stealth.LhandLayer()):
-                # clickonobject doesn't work on id 0
-                stealth.ClickOnObject(self._id)
-                self._name = self._get_name()
-        return self._name
-
-    @name.setter
-    def name(self, value):
-        self._name = value
-
-    @property
-    def name_short(self):
-        name = self.name
-        if not name:
-            return self._id
-
-        short_name = name.split(':')[0].strip()
-        return short_name
 
     @property
     def total_weight(self):
@@ -48,6 +26,26 @@ class Item(Object):
             return stealth.IsMovable(self.id_)
 
         return True
+
+    @property
+    def is_container(self):
+        return stealth.IsContainer(self._id)
+
+    @property
+    def innocent(self):
+        return any(i for i in self._get_click_info() if i.color == LineColor.INNOCENT)
+
+    @property
+    def locked(self):
+        return any(i for i in self._get_click_info()
+                   if i.color == LineColor.WHITE
+                   and 'locked down' in i.text.lower())
+
+    @property
+    def secure(self):
+        return any(i for i in self._get_click_info()
+                   if i.color == LineColor.WHITE
+                   and 'secure' in i.text.lower())
 
 
 if __name__ == '__main__':

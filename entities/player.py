@@ -98,7 +98,7 @@ def mining_cd(func):
 
 # noinspection PyMethodMayBeStatic
 class Player(Creature):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__(_id=Self(), _direct=False)
         self._skill_cd = pendulum.now()
         self._drag_cd = pendulum.now()
@@ -222,18 +222,19 @@ class Player(Creature):
 
         return False
 
-    def open_container(self, container, max_tries=10):
+    @use_cd
+    def open_container(self, container, max_tries=5):
         container = Container.instantiate(container)
         if self.last_container == container and not container.is_empty:
             return
 
-        if not container.exists:
-            log.info(f"Cannot open non-existing {container}")
-            return
-
-        if not container.is_container:
-            log.info(f"Cannot open non-container {container}")
-            return
+        # if not container.exists:
+        #     log.info(f"Cannot open non-existing {container}")
+        #     return
+        #
+        # if not container.is_container:
+        #     log.info(f"Cannot open non-container {container}")
+        #     return
 
         i = 0
         while not self._open_container(container):
@@ -333,6 +334,10 @@ class Player(Creature):
 
         if not item.exists:
             log.info(f"Cannot grab {quantity} of nonexisting {item}")
+            return
+
+        if item.xyz == (0, 0, 0):
+            log.info(f"Cannot grab {quantity} of {item} in coords {item.xyz}")
             return
 
         i = 0
@@ -473,8 +478,7 @@ class Player(Creature):
             type_ids = [type_ids]
         colors = colors or [0xFFFF]
         # noinspection PyArgumentList
-        output = set_find_distance(distance)(self.find_types_container)(
-            type_ids=type_ids, colors=colors, container_ids=[0])
+        output = self.find_types_container(type_ids=type_ids, colors=colors, container_ids=[0], distance=distance)
         return output
 
     @alive_action

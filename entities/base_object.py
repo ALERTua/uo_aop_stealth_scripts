@@ -1,4 +1,4 @@
-from tools import constants
+from tools import constants, tools
 import py_stealth as stealth
 from tools.tools import log
 
@@ -37,24 +37,35 @@ class Object:
 
     @classmethod
     def _get_cached(cls, id_, omit_cache=False, *args, **kwargs):
-        if not omit_cache and id_ in Object.cache.keys() and Object.cache[id_].__class__ == cls:
-            output = Object.cache[id_]
+        if not omit_cache and id_ in cls.cache.keys() and cls.cache[id_].__class__ == cls:
+            output = cls.cache[id_]
             # log.debug(f"Returning cached {output}")
         else:
-            output = cls(id_, _direct=False, *args, **kwargs)
-            Object.cache[id_] = output
+            output = cls.__new__(cls)
+            output.__init__(id_, _direct=False, *args, **kwargs)
+            cls.cache[id_] = output
             # log.debug(f"Creating {output}")
         return output
 
     @classmethod
-    def instantiate(cls, obj, omit_cache=False, *args, **kwargs):
+    def instantiate(cls, obj, omit_cache=False, force_class=False, *args, **kwargs):
         if isinstance(obj, (cls, *cls.__subclasses__())):
             return obj
 
-        if isinstance(obj, Object):  # todo: not perfect
-            return cls._get_cached(obj.id_, omit_cache=omit_cache, *args, **kwargs)
+        cls_ = cls
+        id_ = obj
+        if isinstance(obj, Object):
+            id_ = obj.id_
+        type_id = stealth.GetType(id_)
+        if type_id and not force_class:
+            if type_id in constants.TYPE_IDS_CONTAINER or stealth.IsContainer(id_):
+                from entities.container import Container
+                cls_ = Container
+            elif type_id in constants.TYPE_IDS_WEAPONS:
+                from entities.base_weapon import GenericWeapon
+                cls_ = GenericWeapon
 
-        return cls._get_cached(obj, omit_cache=omit_cache, *args, **kwargs)
+        return cls_._get_cached(id_, omit_cache=omit_cache, *args, **kwargs)
 
     @property
     def id_(self):
@@ -93,11 +104,39 @@ class Object:
         output = stealth.GetName(self._id)
         return output or ''
 
+    def _get_click_info(self):
+        journal_start = stealth.HighJournal() + 1
+        stealth.ClickOnObject(self._id)
+        journal = tools.journal(start_index=journal_start)
+        journal_filtered = [i for i in journal if 'You see: ' in i.text]
+        for i in journal_filtered:
+            i.text = i.text.replace('You see: ', '')
+        return journal_filtered
+
     @property
     def name(self):
-        if not self._name:
-            self._name = self._get_name() or ''
+        if self._name is None:
+            self._name = self._get_name()
+            if not self._name and self._id not in (0, stealth.RhandLayer(), stealth.LhandLayer()):
+                # clickonobject doesn't work on id 0
+                stealth.ClickOnObject(self._id)
+                self._name = self._get_name()
+            if self.name.startswith('[') and self.name.endswith(']'):
+                self._name = " ".join([i.text for i in self._get_click_info()])
         return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+
+    @property
+    def name_short(self):
+        name = self.name
+        if not name:
+            return self._id
+
+        short_name = name.split(':')[0].strip()
+        return short_name
 
     @property
     def x(self):
@@ -123,6 +162,10 @@ class Object:
     @property
     def xy(self):
         return self.x, self.y
+
+    @property
+    def xyz(self):
+        return self.x, self.y, self.z
 
     @property
     def coords(self):

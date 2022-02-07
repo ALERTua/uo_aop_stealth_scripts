@@ -3,6 +3,7 @@ from copy import copy
 
 import pendulum
 
+from entities.base_object import Object
 from entities.base_script import ScriptBase, alive_action, condition, stealth
 from entities.container import Container
 from entities.item import Item
@@ -87,6 +88,10 @@ LJ_SPOTS = [
     (0x0CD6, 2536, 225, 0),
 ]
 
+LJ_SUCCESS_MESSAGES = [
+    'Вы положили несколько бревен в сумку.',
+
+]
 LJ_ERRORS = [
     'Здесь нет больше дерева для вырубки.',
     'Вы не можете использовать клинок на это.',
@@ -319,7 +324,10 @@ class Lumberjack(ScriptBase):
         journal_index = self.jack_tree()
         self.lj_i = 0
         while True:
-            journal_contents = tools.journal(start_index=journal_index)
+            if self.lj_i == 0 or self.lj_i > MAX_LJ_ITERATIONS:
+                journal_contents = tools.journal(start_index=journal_index)
+            else:
+                journal_contents = tools.journal(start_index=stealth.HighJournal())
             skip = [j for j in journal_contents if j.contains(r'skip \d+', regexp=True, return_re_value=True)]
             if any(skip):
                 text = skip[0].text
@@ -331,6 +339,10 @@ class Lumberjack(ScriptBase):
                 self.lj_i = 0
                 journal_index = self.jack_tree()
                 continue
+
+            successes = [e for e in LJ_SUCCESS_MESSAGES if any([j.contains(e) for j in journal_contents])]
+            if successes:
+                self.lj_i -= 1
 
             errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
             if errors:
@@ -351,7 +363,7 @@ class Lumberjack(ScriptBase):
 
             log.info(f"{self.lj_i}/{MAX_LJ_ITERATIONS} Waiting for lumberjacking to complete: "
                      f"{journal_contents[-1].text}")
-            stealth.Wait(constants.USE_COOLDOWN)
+            stealth.Wait(constants.USE_COOLDOWN / 6)
 
     @condition(LOOT_CORPSES)
     def loot_corpses(self, **kwargs):
