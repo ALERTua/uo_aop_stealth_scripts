@@ -223,7 +223,7 @@ class Player(Creature):
         return False
 
     @use_cd
-    def open_container(self, container, max_tries=5):
+    def open_container(self, container, max_tries=15):
         container = Container.instantiate(container)
         if self.last_container == container and not container.is_empty:
             return
@@ -286,9 +286,7 @@ class Player(Creature):
             tools.result_delay()
 
         # Xdst, Ydst, Optimized, Accuracy, Running
-        result = newMoveXY(x, y, optimized, accuracy, running)
-        if not result:
-            result = MoveXY(x, y, optimized, accuracy, running)
+        result = newMoveXY(x, y, optimized, accuracy, running) or newMoveXY(x, y, optimized, accuracy, running)
         return result
 
     @alive_action
@@ -379,9 +377,9 @@ class Player(Creature):
             log.info(f"Cannot use {obj}")
             return
 
-        if not obj.exists:
-            log.info(f"Cannot use nonexistent {obj}")
-            return
+        # if not obj.exists:
+        #     log.info(f"Cannot use nonexistent {obj}")
+        #     return
 
         if announce:
             log.info(f"Using {obj}")
@@ -588,7 +586,8 @@ class Player(Creature):
         delay = delay or constants.LOOT_COOLDOWN
         if use_container_before_looting:
             if not self.open_container(container):
-                return
+                # return False
+                pass
 
         return EmptyContainer(container.id_, destination.id_, delay)
 

@@ -25,7 +25,7 @@ EQUIP_WEAPONS_FROM_LOOT_CONTAINER = True
 RESET_PROCESSED_MOBS_ON_UNLOAD = True
 MAX_WEAPON_SEARCH_DISTANCE = 20
 CORPSE_FIND_DISTANCE = 20
-MAX_LJ_ITERATIONS = 3
+MAX_LJ_ITERATIONS = 5
 LJ_DISTANCE_TO_TREE = 1
 LJ_CONTAINER_ID = 0x728F3B3B
 LJ_CONTAINER_COORDS = (2470, 182)
@@ -90,7 +90,7 @@ LJ_SPOTS = [
 
 LJ_SUCCESS_MESSAGES = [
     'Вы положили несколько бревен в сумку.',
-
+    'Вы нарубили брёвна ',
 ]
 LJ_ERRORS = [
     'Здесь нет больше дерева для вырубки.',
