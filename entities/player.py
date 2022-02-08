@@ -299,9 +299,9 @@ class Player(Creature):
             return
 
         container = Container.instantiate(target_id) if target_id else self.backpack
-        if not container.exists:
-            log.info(f"Cannot move {item} to nonexistent {container}")
-            return
+        # if not container.exists:
+        #     log.info(f"Cannot move {item} to nonexistent {container}")
+        #     return
 
         if not container.is_container:
             log.info(f"Cannot move {item} to non-container {container}")
@@ -807,7 +807,7 @@ class Player(Creature):
         if creature_types and not isinstance(creature_types, Iterable):
             creature_types = [creature_types]
         found = [set_find_distance(distance)(FindType)(-1, 0)] + GetFindedList()
-        output = [Creature.instantiate(i) for i in found if i]
+        output = [Creature.instantiate(i, force_class=True) for i in found if i]
         output = [i for i in output if not stealth.IsMovable(i.id_)]
         if creature_types:
             output = [i for i in output if i.type_id in creature_types]

@@ -156,7 +156,8 @@ class ScriptBase:
         if ranged:
             if not isinstance(ranged_weapon, WeaponBase):
                 ranged_weapon = GenericWeapon.instantiate(ranged_weapon)
-        while mob.alive:
+        i = 0
+        while mob.alive and (i := i + 1) < 400:
             # noinspection PyProtectedMember
             if self.player._mount == mob.id_:
                 break

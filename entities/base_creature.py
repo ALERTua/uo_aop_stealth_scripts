@@ -55,11 +55,11 @@ class Creature(Object):
 
     @property
     def alive(self):
-        return IsObjectExists(self._id) and not IsDead(self._id) and self.hp > 0
+        return not self.dead or self.hp > 0
 
     @property
     def dead(self):
-        return not IsObjectExists(self._id) or IsDead(self._id) or self.hp <= 0
+        return IsDead(self._id)
 
     @property
     def human(self):
