@@ -294,9 +294,9 @@ class Player(Creature):
     def move_item(self, item_id, quantity=-1, target_id=None, x=0, y=0, z=0, max_tries=10, allow_same_container=False):
         # ItemID, Count, MoveIntoID, X, Y, Z
         item = Item.instantiate(item_id)
-        if not item.exists:
-            log.info(f"Cannot move nonexistent {item}")
-            return
+        # if not item.exists:
+        #     log.info(f"Cannot move nonexistent {item}")
+        #     return
 
         container = Container.instantiate(target_id) if target_id else self.backpack
         # if not container.exists:
