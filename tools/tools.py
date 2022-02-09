@@ -33,6 +33,7 @@ def debug(ip=None):
         pydevd_pycharm.settrace(ip, port=port, stdoutToServer=True, stderrToServer=True, suspend=False)
     except Exception as e:
         print("Error connecting to PyCharm Debugger @ %s:%s : %s %s" % (ip, port, type(e), e))
+        log.verbose = False
         return False
 
     log.info("Connected to PyCharm Debugger @ %s:%s" % (ip, port))
@@ -119,10 +120,12 @@ def string_in_strings(str_, strings):
 def journal(start_index=None, end_index=None):
     start_index = stealth.LowJournal() if start_index is None else start_index
     end_index = stealth.HighJournal() if end_index is None else end_index
-    line_numbers = range(start_index, end_index + 1)
+    line_ids = range(start_index, end_index + 1)
     output = []
-    for line_number in line_numbers:
-        output.append(JournalLine(line_number))
+    for line_id in line_ids:
+        line = JournalLine(line_id)
+        if line.text:
+            output.append(line)
     return output
 
 

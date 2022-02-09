@@ -1,3 +1,4 @@
+import random
 from collections import namedtuple
 from collections.abc import Iterable
 from copy import copy
@@ -44,46 +45,58 @@ def alive_action(func):
 
 
 def _cooldown(class_instance, cooldown_field, cooldown, func, *args, **kwargs):
-    previous = getattr(class_instance, cooldown_field)
-    left = pendulum.now() - previous
-    milliseconds_left = left.microseconds / 1000
-    time_left = cooldown - milliseconds_left
-    if time_left > 0:
-        Wait(time_left)
+    cooldown_value = getattr(class_instance, cooldown_field)
+    if cooldown_value > pendulum.now():
+        left = cooldown_value - pendulum.now()
+        time_left = cooldown - left.microseconds / 1000
+        if time_left > 0:
+            Wait(time_left)
 
+    set_cooldown = kwargs.pop('set_cooldown', True)
     output = func(class_instance, *args, **kwargs)
-    setattr(class_instance, cooldown_field, pendulum.now())
+
+    if set_cooldown:
+        new_now = pendulum.now() + pendulum.Duration(milliseconds=cooldown)
+        setattr(class_instance, cooldown_field, new_now)
     return output
 
 
 def skill_cd(func):
     @wraps(func)
-    def wrapper_skill_cd(self, *args, **kwargs):
-        return _cooldown(self, '_skill_cd', constants.SKILL_COOLDOWN, func, *args, **kwargs)
+    def wrapper_skill_cd(player, *args, **kwargs):
+        return _cooldown(player, 'skill_cooldown', constants.SKILL_COOLDOWN, func, *args, **kwargs)
 
     return wrapper_skill_cd
 
 
 def drag_cd(func):
     @wraps(func)
-    def wrapper_drag_cd(self, *args, **kwargs):
-        return _cooldown(self, '_drag_cd', constants.DRAG_COOLDOWN, func, *args, **kwargs)
+    def wrapper_drag_cd(player, *args, **kwargs):
+        return _cooldown(player, 'drag_cooldown', constants.DRAG_COOLDOWN, func, *args, **kwargs)
 
     return wrapper_drag_cd
 
 
 def use_cd(func):
     @wraps(func)
-    def wrapper_use_cd(self, *args, **kwargs):
-        return _cooldown(self, '_use_cd', constants.USE_COOLDOWN, func, *args, **kwargs)
+    def wrapper_use_cd(player, *args, **kwargs):
+        return _cooldown(player, 'use_cooldown', constants.USE_COOLDOWN, func, *args, **kwargs)
+
+    return wrapper_use_cd
+
+
+def container_cd(func):
+    @wraps(func)
+    def wrapper_use_cd(player, *args, **kwargs):
+        return _cooldown(player, 'use_cooldown', constants.USE_COOLDOWN, func, *args, set_cooldown=False, **kwargs)
 
     return wrapper_use_cd
 
 
 def bandage_cd(func):
     @wraps(func)
-    def wrapper_use_cd(self, *args, **kwargs):
-        return _cooldown(self, '_use_cd', constants.BANDAGE_COOLDOWN, func, *args, **kwargs)
+    def wrapper_use_cd(player, *args, **kwargs):
+        return _cooldown(player, 'use_cooldown', constants.BANDAGE_COOLDOWN, func, *args, **kwargs)
 
     return wrapper_use_cd
 
@@ -91,20 +104,44 @@ def bandage_cd(func):
 def mining_cd(func):
     @wraps(func)
     def wrapper_use_cd(player, *args, **kwargs):
-        return _cooldown(player, '_use_cd', constants.MINING_COOLDOWN, func, *args, **kwargs)
+        return _cooldown(player, 'use_cooldown', constants.MINING_COOLDOWN, func, *args, **kwargs)
 
     return wrapper_use_cd
 
 
-# noinspection PyMethodMayBeStatic
 class Player(Creature):
     def __init__(self, **kwargs):
         super().__init__(_id=Self(), _direct=False)
-        self._skill_cd = pendulum.now()
-        self._drag_cd = pendulum.now()
-        self._use_cd = pendulum.now()
+        self._skill_cooldown = None
+        self._drag_cooldown = None
+        self._use_cooldown = None
         self._mount = None
         SetFindDistance(99)
+
+    @property
+    def use_cooldown(self) -> pendulum.DateTime:
+        output = pendulum.now() if self._use_cooldown is None else self._use_cooldown
+        return output
+
+    @use_cooldown.setter
+    def use_cooldown(self, value):
+        self._use_cooldown = value
+
+    @property
+    def skill_cooldown(self):
+        return self._skill_cooldown or pendulum.now()
+
+    @skill_cooldown.setter
+    def skill_cooldown(self, value):
+        self._skill_cooldown = value
+
+    @property
+    def drag_cooldown(self):
+        return self._drag_cooldown or pendulum.now()
+
+    @drag_cooldown.setter
+    def drag_cooldown(self, value):
+        self._drag_cooldown = value
 
     @property
     def hp(self):
@@ -214,7 +251,7 @@ class Player(Creature):
         if self.last_container == container and not container.is_empty:
             return True
 
-        self._use_object(container)  # without the cooldown
+        self._use_object(container, announce=False)  # without the cooldown
         for _ in range(1):  # double check result
             tools.result_delay()
             if self.last_container == container:
@@ -222,12 +259,15 @@ class Player(Creature):
 
         return False
 
-    @use_cd
+    @container_cd
     def open_container(self, container, max_tries=15):
-        container = Container.instantiate(container)
+        container = Container.instantiate(container, force_class=True)
         if self.last_container == container and not container.is_empty:
             return
 
+        # if self.use_cooldown < pendulum.now():
+        #     left = pendulum.now()
+        #     tools._delay(left)
         # if not container.exists:
         #     log.info(f"Cannot open non-existing {container}")
         #     return
@@ -236,18 +276,19 @@ class Player(Creature):
         #     log.info(f"Cannot open non-container {container}")
         #     return
 
-        i = 0
-        while not self._open_container(container):
-            i += 1
+        result = self._open_container(container)
+        if not result:
+            i = 0
+            while not (result := self._open_container(container)) and (i := i + 1) < max_tries:
+                if not result:
+                    # noinspection PyProtectedMember
+                    tools._delay(constants.USE_COOLDOWN)
+
             if i >= max_tries:
                 log.info(f"Couldn't open {container} after {max_tries} tries")
                 return False
 
-            # noinspection PyProtectedMember
-            tools._delay(constants.USE_COOLDOWN)
-
-        log.debug(f"Successfuly opened {container}")
-        tools.result_delay()
+            log.debug(f"Successfuly opened {container}")
         return True
 
     @alive_action
@@ -292,13 +333,15 @@ class Player(Creature):
     @alive_action
     @drag_cd
     def move_item(self, item_id, quantity=-1, target_id=None, x=0, y=0, z=0, max_tries=10, allow_same_container=False):
+        if isinstance(item_id, Iterable):
+            item_id = random.choice(item_id)
         # ItemID, Count, MoveIntoID, X, Y, Z
         item = Item.instantiate(item_id)
         # if not item.exists:
         #     log.info(f"Cannot move nonexistent {item}")
         #     return
 
-        container = Container.instantiate(target_id) if target_id else self.backpack
+        container = Container.instantiate(target_id, force_class=True) if target_id else self.backpack
         # if not container.exists:
         #     log.info(f"Cannot move {item} to nonexistent {container}")
         #     return
@@ -459,7 +502,7 @@ class Player(Creature):
     @alive_action
     def break_action(self):
         self.war_mode = True
-        tools.ping_delay()
+        tools.result_delay()
         self.war_mode = False
 
     @set_find_distance(constants.USE_GROUND_RANGE)
@@ -482,6 +525,8 @@ class Player(Creature):
     @alive_action
     def find_types_container(self, type_ids, colors=None, container_ids=None, recursive=False, distance=99):
         colors = colors or [0xFFFF]
+        if not isinstance(type_ids, Iterable):
+            type_ids = [type_ids]
         if not isinstance(container_ids, Iterable):
             container_ids = [container_ids]
         if not isinstance(colors, Iterable):

@@ -64,6 +64,9 @@ class Object:
             elif type_id in constants.TYPE_IDS_WEAPONS:
                 from entities.base_weapon import GenericWeapon
                 cls_ = GenericWeapon
+            elif type_id in constants.TYPE_IDS_CREATURE:
+                from entities.base_creature import Creature
+                cls_ = Creature
 
         return cls_._get_cached(id_, omit_cache=omit_cache, *args, **kwargs)
 

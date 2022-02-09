@@ -1,5 +1,6 @@
 import re
 from copy import copy
+from typing import Iterable
 
 import pendulum
 
@@ -28,6 +29,7 @@ CORPSE_FIND_DISTANCE = 20
 MAX_LJ_ITERATIONS = 5
 LJ_DISTANCE_TO_TREE = 1
 LJ_CONTAINER_ID = 0x728F3B3B
+LOOT_CONTAINER_OPEN_SUBCONTAINERS = True
 LJ_CONTAINER_COORDS = (2470, 182)
 WOOD_ENTRANCE = (2503, 167)
 WOOD_ZONE_Y = 188
@@ -91,6 +93,7 @@ LJ_SPOTS = [
 LJ_SUCCESS_MESSAGES = [
     'Вы положили несколько бревен в сумку.',
     'Вы нарубили брёвна ',
+    'Вы рубите, но бревна у Вас не получаются.',
 ]
 LJ_ERRORS = [
     'Здесь нет больше дерева для вырубки.',
@@ -164,7 +167,18 @@ class Lumberjack(ScriptBase):
             self.player.move(*self.loot_container.xy, accuracy=0)
             log.info("Moving to unload done")
         tools.ping_delay()
-        self.player.open_container(self.loot_container)
+        if self.loot_container.is_empty:
+            self.player.open_container(self.loot_container)
+        subcontainers = LOOT_CONTAINER_OPEN_SUBCONTAINERS
+        if subcontainers:
+            if isinstance(subcontainers, Iterable):
+                subcontainers = [Container.instantiate(i, force_class=True) for i in subcontainers]
+            else:
+                subcontainers = self.player.find_types_container(
+                    constants.TYPE_IDS_CONTAINER, container_ids=self.loot_container, recursive=True)
+            for container in subcontainers:
+                if container.is_empty:
+                    self.player.open_container(container)
 
     @alive_action
     def check_hatchet(self):
@@ -176,7 +190,8 @@ class Lumberjack(ScriptBase):
 
         log.info("Moving to grab a Hatchet")
         self.move_to_unload()
-        container_hatchet = self.player.find_type(constants.TYPE_ID_HATCHET, self.loot_container)
+        container_hatchet = self.player.find_types_container(constants.TYPE_ID_HATCHET,
+                                                             container_ids=self.loot_container, recursive=True)
         if not container_hatchet:
             todo = stealth.GetFindedList()
             log.info("WARNING! NO SPARE HATCHETS FOUND!")
@@ -324,10 +339,12 @@ class Lumberjack(ScriptBase):
         journal_index = self.jack_tree()
         self.lj_i = 0
         while True:
-            if self.lj_i == 0 or self.lj_i > MAX_LJ_ITERATIONS:
-                journal_contents = tools.journal(start_index=journal_index)
-            else:
-                journal_contents = tools.journal(start_index=stealth.HighJournal())
+            # if self.lj_i == 0 or self.lj_i > MAX_LJ_ITERATIONS:
+            #     pass
+            # else:
+            if self.lj_i > 0:
+                journal_index = stealth.HighJournal()
+            journal_contents = tools.journal(start_index=journal_index)
             skip = [j for j in journal_contents if j.contains(r'skip \d+', regexp=True, return_re_value=True)]
             if any(skip):
                 text = skip[0].text
@@ -343,6 +360,7 @@ class Lumberjack(ScriptBase):
             successes = [e for e in LJ_SUCCESS_MESSAGES if any([j.contains(e) for j in journal_contents])]
             if successes:
                 self.lj_i -= 1
+                # log.debug(f"success {self.lj_i + 1}=>{self.lj_i} {successes}")
 
             errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
             if errors:
@@ -362,7 +380,7 @@ class Lumberjack(ScriptBase):
                 self.lj_i = 0
 
             log.info(f"{self.lj_i}/{MAX_LJ_ITERATIONS} Waiting for lumberjacking to complete: "
-                     f"{journal_contents[-1].text}")
+                     f"{len(journal_contents)} {journal_contents[-1].text}")
             stealth.Wait(constants.USE_COOLDOWN / 6)
 
     @condition(LOOT_CORPSES)

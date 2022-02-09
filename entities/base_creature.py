@@ -59,7 +59,7 @@ class Creature(Object):
 
     @property
     def dead(self):
-        return IsDead(self._id)
+        return not IsObjectExists(self._id) or IsDead(self._id)
 
     @property
     def human(self):

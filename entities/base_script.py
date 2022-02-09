@@ -224,8 +224,8 @@ class ScriptBase:
                              ranged_unmount=ranged_unmount, ranged_keep_distance=ranged_keep_distance)
         log.info(f"Done Engaging {mob}")
         self.player.war_mode = False
-        if not notify_only_mutated or (notify_only_mutated and mob.mutated):
-            tools.telegram_message(f"{mob} dead", disable_notification=not mob.mutated)
+        # if not notify_only_mutated or (notify_only_mutated and mob.mutated):
+        #     tools.telegram_message(f"{mob} dead", disable_notification=not mob.mutated)
         if loot:
             self.player.break_action()
             range_ = constants.USE_GROUND_RANGE
@@ -568,11 +568,13 @@ class ScriptBase:
                      drop_trash_items=True, trash_items=None, creature_types=None, notorieties=None):
         output = False
         notorieties = [constants.Notoriety.Murderer] if notorieties is None else notorieties
-        while creatures := self._find_mobs(mob_find_distance=mob_find_distance, notorieties=notorieties,
-                                           creature_types=creature_types, path_distance=path_distance):
+        action_broke = False
+        while self.player.alive and (creatures := self._find_mobs(
+                mob_find_distance=mob_find_distance, notorieties=notorieties, creature_types=creature_types,
+                path_distance=path_distance)):
             for creature in creatures:
                 # noinspection PyProtectedMember
-                mob = Mob.instantiate(creature.id_, omit_cache=True)
+                mob = Mob.instantiate(creature.id_, omit_cache=True, force_class=True)
                 if mob in self._processed_mobs:
                     log.debug(f"Skipping processed {mob}")
                     continue
@@ -595,6 +597,10 @@ class ScriptBase:
                 #     tools.telegram_message(f"{mob} detected at distance {mob.path_distance()}",
                 #                            disable_notification=not mob.mutated)
                 if engage:
+                    if not action_broke:
+                        self.player.break_action()
+                        action_broke = True
+
                     # noinspection PyProtectedMember
                     max_distance = constants.ENGAGE_MAX_DISTANCE
                     if not ranged and mob_path_distance <= 1:
@@ -622,7 +628,7 @@ class ScriptBase:
             return
 
         container_id = container_id or self.loot_container
-        container = Container.instantiate(container_id)
+        container = Container.instantiate(container_id, force_class=True)
         log.info(f"Rearming from {container}")
         weapon_type_ids = weapon_type_ids or constants.TYPE_IDS_WEAPONS
         if not weapon_type_ids:
@@ -635,11 +641,11 @@ class ScriptBase:
             if self.player.weapon_equipped:
                 break
 
-            found_weapon = self.player.find_type(weapon_type_id, container)
+            found_weapon = self.player.find_types_container(weapon_type_id, container_ids=container, recursive=True)
             if not found_weapon:
                 continue
 
-            self.player.equip_object(found_weapon, stealth.RhandLayer())
+            self.player.equip_object(found_weapon[0], stealth.RhandLayer())  # todo: random.choice
             tools.result_delay()
 
     @alive_action
