@@ -280,9 +280,8 @@ class Player(Creature):
         if not result:
             i = 0
             while not (result := self._open_container(container)) and (i := i + 1) < max_tries:
-                if not result:
-                    # noinspection PyProtectedMember
-                    tools._delay(constants.USE_COOLDOWN)
+                # noinspection PyProtectedMember
+                tools._delay(constants.USE_COOLDOWN)
 
             if i >= max_tries:
                 log.info(f"Couldn't open {container} after {max_tries} tries")
