@@ -55,7 +55,7 @@ class Creature(Object):
 
     @property
     def alive(self):
-        return not self.dead or self.hp > 0
+        return not self.dead and self.hp > 0
 
     @property
     def dead(self):

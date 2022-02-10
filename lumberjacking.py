@@ -4,7 +4,6 @@ from typing import Iterable
 
 import pendulum
 
-from entities.base_object import Object
 from entities.base_script import ScriptBase, alive_action, condition, stealth
 from entities.container import Container
 from entities.item import Item
@@ -13,7 +12,7 @@ from entities.weapon import Hatchet
 from tools import constants, tools
 from tools.tools import log
 
-LJ_SLOGS = True
+LJ_SLOGS = True  # simple logs
 ENGAGE_MOBS = True
 ENGAGE_CRITTERS = True
 MOB_FIND_DISTANCE = 25
@@ -89,9 +88,11 @@ LJ_SPOTS = [
     (0x0CD6, 2536, 243, 0),
     (0x0CD6, 2536, 225, 0),
 ]
-
-LJ_SUCCESS_MESSAGES = [
+LJ_SLOGS_SUCCESS = [
     'Вы положили несколько бревен в сумку.',
+]
+LJ_SUCCESS_MESSAGES = [
+    *LJ_SLOGS_SUCCESS,
     'Вы нарубили брёвна ',
     'Вы рубите, но бревна у Вас не получаются.',
 ]
@@ -101,7 +102,8 @@ LJ_ERRORS = [
     'Вы находитесь слишком далеко!',
 ]
 if not LJ_SLOGS:
-    LJ_ERRORS.append('Вы положили несколько бревен в сумку.')
+    LJ_ERRORS.extend(LJ_SLOGS_SUCCESS)
+    [LJ_SUCCESS_MESSAGES.remove(i) for i in LJ_SLOGS_SUCCESS]
 
 
 class Lumberjack(ScriptBase):
@@ -339,9 +341,6 @@ class Lumberjack(ScriptBase):
         journal_index = self.jack_tree()
         self.lj_i = 0
         while True:
-            # if self.lj_i == 0 or self.lj_i > MAX_LJ_ITERATIONS:
-            #     pass
-            # else:
             if self.lj_i > 0:
                 journal_index = stealth.HighJournal()
             journal_contents = tools.journal(start_index=journal_index)
@@ -353,27 +352,28 @@ class Lumberjack(ScriptBase):
                 log.info(f"Skipping {trees_quantity} trees")
                 for i in range(trees_quantity):
                     self.tree_depleeted()
-                self.lj_i = 0
                 journal_index = self.jack_tree()
+                self.lj_i = 0
                 continue
 
             successes = [e for e in LJ_SUCCESS_MESSAGES if any([j.contains(e) for j in journal_contents])]
+            errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
             if successes:
+                journal_index = stealth.HighJournal()
                 self.lj_i -= 1
                 # log.debug(f"success {self.lj_i + 1}=>{self.lj_i} {successes}")
 
-            errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
             if errors:
                 log.debug(f"Depletion message detected: {errors[0]}")
                 self.tree_depleeted()
-                self.lj_i = 0
                 self._checks()
                 if self.general_weight_check():
                     self.lj_i = MAX_LJ_ITERATIONS
                 journal_index = self.jack_tree()
+                self.lj_i = 0
                 continue
 
-            self._checks(loot_corpses=False)  # check for overweight too, and loot corpses
+            self._checks(loot_corpses=False)
             self.lj_i += 1
             if self.lj_i > MAX_LJ_ITERATIONS:
                 journal_index = self.jack_tree()
