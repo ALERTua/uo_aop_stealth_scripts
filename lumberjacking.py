@@ -25,7 +25,7 @@ EQUIP_WEAPONS_FROM_LOOT_CONTAINER = True
 RESET_PROCESSED_MOBS_ON_UNLOAD = True
 MAX_WEAPON_SEARCH_DISTANCE = 20
 CORPSE_FIND_DISTANCE = 20
-MAX_LJ_ITERATIONS = 5
+MAX_LJ_ITERATIONS = 4  # starting from 0
 LJ_DISTANCE_TO_TREE = 1
 LJ_CONTAINER_ID = 0x728F3B3B
 LOOT_CONTAINER_OPEN_SUBCONTAINERS = True
@@ -215,26 +215,25 @@ class Lumberjack(ScriptBase):
     def eat(self, **kwargs):
         return super().eat(container_id=self.loot_container)
 
-    def count_logs(self, recursive=True):
-        logs = self.player.find_types_backpack(type_ids=self.unload_itemids, recursive=recursive)
-        if not logs:
+    def record_stats(self):
+        items = self.player.find_types_backpack(type_ids=self.unload_itemids, recursive=True)
+        if not items:
             return
 
-        for logs_id in logs:
-            log_obj = Item.instantiate(logs_id)
-            log_type = log_obj.type_id
-            log_color = log_obj.color
-            log_quantity = log_obj.quantity
-            log_name = log_obj.name_short
-            entry_name = f"{log_type}({log_color}){log_name}"
-            if self.script_stats.get(entry_name, None) is None:
-                self.script_stats[entry_name] = 0
-            self.script_stats[entry_name] += log_quantity
+        for item in items:
+            items_obj = Item.instantiate(item)
+            type_id = items_obj.type_id
+            color = items_obj.color
+            quantity = items_obj.quantity
+            name = items_obj.name_short
+            entry_name = f"{type_id}({color}){name}"
+            log.debug(f"StatLogging {item}")
+            self.script_stats[entry_name] = self.script_stats.get(entry_name, 0) + quantity
 
     def unload(self, **kwargs):
         log.info("Unloading")
         self.move_to_unload()
-        self.count_logs()
+        self.record_stats()
         self.parse_commands()
         self.player.unload_types(self.unload_itemids, self.loot_container)
         self.check_hatchet()
@@ -382,9 +381,11 @@ class Lumberjack(ScriptBase):
                 previous_journal_index = self.jack_tree()
                 self.lj_i = 0
 
-            last_line = journal_contents[-1].text if journal_contents else ''
-            log.info(f"{len(self._trees)}/{len(LJ_SPOTS)} {self.lj_i}/{MAX_LJ_ITERATIONS + 1} "
-                     f"lumberjacking: {len(journal_contents)} {last_line}")
+            line_contents = ''
+            if journal_contents:
+                line_contents = f" : {len(journal_contents)} : {journal_contents[-1].text_clean}"
+            log.info(f"{len(self._trees)}/{len(LJ_SPOTS)} {self.player.weight:>3}/{self.player.max_weight} "
+                     f"{self.lj_i}/{MAX_LJ_ITERATIONS + 1}{line_contents}")
             stealth.Wait(constants.USE_COOLDOWN / 6)
 
     @condition(LOOT_CORPSES)

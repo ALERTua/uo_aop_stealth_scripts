@@ -139,6 +139,8 @@ class Object:
             return self._id
 
         short_name = name.split(':')[0].strip()
+        short_name = short_name.lstrip('a').strip()
+        short_name = short_name.split('made by')[0].strip()
         return short_name
 
     @property

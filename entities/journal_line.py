@@ -8,7 +8,7 @@ import py_stealth as stealth
 class JournalLine:
     def __init__(self, journal_id):
         self.journal_id = journal_id
-        self.text = stealth.Journal(self.journal_id)
+        self.text = stealth.Journal(self.journal_id)  # type: str
         self.color = stealth.LineTextColor()
         try:
             self.color = LineColor(self.color)
@@ -24,7 +24,7 @@ class JournalLine:
         # self.font = LineTextFont()
 
     def __str__(self):
-        return self.text
+        return f"({self.journal_id}){self.text}"
 
     def __repr__(self):
         return self.__str__()
@@ -41,6 +41,26 @@ class JournalLine:
                 return True
 
         return False
+
+    @property
+    def system(self):
+        text = self.text
+        if not text:
+            return False
+
+        return text.startswith('System:')
+
+    @property
+    def text_clean(self):
+        text = self.text
+        if not text or ':' not in text:
+            return text
+
+        output = text.split(':')
+        output = output[1:]
+        output = " ".join(output)
+        output = output.strip()
+        return output
 
 
 @unique

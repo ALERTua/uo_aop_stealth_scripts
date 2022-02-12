@@ -355,12 +355,12 @@ class Player(Creature):
             return
 
         i = 0
-        log.info(f"Moving {quantity}×{item} to {container}.")
+        log.info(f"Moving {item} to {container}.")
         while not (move_result := MoveItem(item.id_, quantity, container.id_, x, y, z)) \
                 and item.parent == item_container and (i := i + 1) < max_tries:
             log.info(f".")
             tools.result_delay()
-        log.debug(f"done. Moving success: {move_result}")
+        # log.debug(f"done. Moving success: {move_result}")
         return move_result
 
     @alive_action
