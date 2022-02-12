@@ -490,14 +490,17 @@ class ScriptBase:
 
     def check_health(self, resurrect=False):
         if self.player.dead:
-            if resurrect:
-                tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}. '
-                                       f'Resurrecting.')
-                self.resurrect()
-            else:
-                tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}')
-                self.player.move(*constants.COORDS_MINOC_HEALER)
-                self.quit()
+            # noinspection PyProtectedMember
+            tools._delay(15000)  # in case of false-positive at relogin
+            if self.player.dead:
+                if resurrect:
+                    tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}. '
+                                           f'Resurrecting.')
+                    self.resurrect()
+                else:
+                    tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}')
+                    self.player.move(*constants.COORDS_MINOC_HEALER)
+                    self.quit()
 
         if not self.player.got_bandages:
             return False
