@@ -32,6 +32,7 @@ LOOT_CONTAINER_OPEN_SUBCONTAINERS = True
 LJ_CONTAINER_COORDS = (2470, 182)
 WOOD_ENTRANCE = (2503, 167)
 WOOD_ZONE_Y = 188
+MOUNT_ID = 0x076C4894
 LJ_TRASH = [
     *constants.ITEM_IDS_TRASH,
     constants.TYPE_ID_ARMOR_LEATHER_BUSTIER,
@@ -93,7 +94,7 @@ LJ_SLOGS_SUCCESS = [
 ]
 LJ_SUCCESS_MESSAGES = [
     *LJ_SLOGS_SUCCESS,
-    'Вы нарубили брёвна ',
+    'Вы нарубили ',
     'Вы рубите, но бревна у Вас не получаются.',
 ]
 LJ_ERRORS = [
@@ -120,6 +121,7 @@ class Lumberjack(ScriptBase):
             (constants.TYPE_ID_LOGS, constants.COLOR_LOGS_S, constants.WEIGHT_LOGS),
             (constants.TYPE_ID_LOGS, -1, constants.WEIGHT_LOGS),
         ]
+        self.player._mount = MOUNT_ID
 
     @property
     def current_tree(self):
@@ -154,7 +156,7 @@ class Lumberjack(ScriptBase):
         self._checks()
         tile_type, x, y, z = self.current_tree
         while self.player.distance_to(x, y) > LJ_DISTANCE_TO_TREE:
-            log.info(f"Moving to the next tree: {self.current_tree}")
+            log.info(f"{len(self._trees)}/{len(LJ_SPOTS)} Moving to the next tree: {self.current_tree}")
             self.wait_stamina(5)
             self.player.move(x, y, accuracy=LJ_DISTANCE_TO_TREE, running=self.should_run)
             self._checks()
@@ -166,7 +168,7 @@ class Lumberjack(ScriptBase):
             if self.in_woods:
                 self.go_woods()
             self.wait_stamina()
-            self.player.move(*self.loot_container.xy, accuracy=0)
+            self.player.move_to_object(self.loot_container, accuracy=1)
             log.info("Moving to unload done")
         tools.ping_delay()
         if self.loot_container.is_empty:
@@ -192,8 +194,8 @@ class Lumberjack(ScriptBase):
 
         log.info("Moving to grab a Hatchet")
         self.move_to_unload()
-        container_hatchet = self.player.find_types_container(constants.TYPE_ID_HATCHET,
-                                                             container_ids=self.loot_container, recursive=True)
+        container_hatchet = self.player.find_types_container(
+            constants.TYPE_ID_HATCHET, container_ids=self.loot_container, recursive=True)
         if not container_hatchet:
             todo = stealth.GetFindedList()
             log.info("WARNING! NO SPARE HATCHETS FOUND!")
@@ -338,12 +340,14 @@ class Lumberjack(ScriptBase):
             self.general_weight_check()
 
     def lumberjack_process(self):
-        journal_index = self.jack_tree()
+        previous_journal_index = self.jack_tree()
         self.lj_i = 0
         while True:
-            if self.lj_i > 0:
-                journal_index = stealth.HighJournal()
-            journal_contents = tools.journal(start_index=journal_index)
+            highjournal = stealth.HighJournal()
+            journal_contents = []
+            if previous_journal_index != highjournal:
+                journal_contents = tools.journal(start_index=highjournal)
+
             skip = [j for j in journal_contents if j.contains(r'skip \d+', regexp=True, return_re_value=True)]
             if any(skip):
                 text = skip[0].text
@@ -352,35 +356,35 @@ class Lumberjack(ScriptBase):
                 log.info(f"Skipping {trees_quantity} trees")
                 for i in range(trees_quantity):
                     self.tree_depleeted()
-                journal_index = self.jack_tree()
+                previous_journal_index = self.jack_tree()
                 self.lj_i = 0
                 continue
 
             successes = [e for e in LJ_SUCCESS_MESSAGES if any([j.contains(e) for j in journal_contents])]
-            errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
             if successes:
-                journal_index = stealth.HighJournal()
-                self.lj_i -= 1
-                # log.debug(f"success {self.lj_i + 1}=>{self.lj_i} {successes}")
+                previous_journal_index = highjournal
+                self.lj_i = 0
 
+            errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
             if errors:
-                log.debug(f"Depletion message detected: {errors[0]}")
+                log.debug(f"{len(self._trees)}/{len(LJ_SPOTS)} Depletion message detected: {errors[0]}")
                 self.tree_depleeted()
                 self._checks()
                 if self.general_weight_check():
                     self.lj_i = MAX_LJ_ITERATIONS
-                journal_index = self.jack_tree()
+                previous_journal_index = self.jack_tree()
                 self.lj_i = 0
                 continue
 
             self._checks(loot_corpses=False)
             self.lj_i += 1
             if self.lj_i > MAX_LJ_ITERATIONS:
-                journal_index = self.jack_tree()
+                previous_journal_index = self.jack_tree()
                 self.lj_i = 0
 
-            log.info(f"{self.lj_i}/{MAX_LJ_ITERATIONS} Waiting for lumberjacking to complete: "
-                     f"{len(journal_contents)} {journal_contents[-1].text}")
+            last_line = journal_contents[-1].text if journal_contents else ''
+            log.info(f"{len(self._trees)}/{len(LJ_SPOTS)} {self.lj_i}/{MAX_LJ_ITERATIONS + 1} "
+                     f"lumberjacking: {len(journal_contents)} {last_line}")
             stealth.Wait(constants.USE_COOLDOWN / 6)
 
     @condition(LOOT_CORPSES)

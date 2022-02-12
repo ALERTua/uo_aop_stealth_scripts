@@ -89,6 +89,10 @@ TYPE_IDS_MOUNT = [
 ]
 NAMES_MOUNT = [
     'a drake',
+    'ostrich',
+    'zostrich',
+    'nightmare',
+    'lama',
 ]
 TYPE_IDS_CRITTER = [
     TYPE_ID_EAGLE,

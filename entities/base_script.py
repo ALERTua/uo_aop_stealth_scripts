@@ -20,7 +20,6 @@ BANK_COORDS = (2512, 556)
 HEALER_COORDS = constants.COORDS_MINOC_HEALER
 
 
-
 def condition(condition_):
     def real_decorator(func):
         @wraps(func)
@@ -182,9 +181,12 @@ class ScriptBase:
                 if mob.distance > 1:
                     self.player.move(mob.x, mob.y)
                 else:
-                    log.debug(f"Won't engage {mob} that is already at distance {mob.distance}")
+                    pass  # log.debug(f"Won't engage {mob} that is already at distance {mob.distance}")
             check_health_func()  # script_check_health in scripts
             self.player.attack(mob.id_)
+            log.info(f"({self.player.hp}/{self.player.max_hp}) "
+                     f"Fight with ({mob.hp}/{mob.max_hp}){mob} at range {mob.distance}")
+            tools.result_delay()
         if remount and self.player.unmounted:
             # noinspection PyProtectedMember
             mount = Creature.instantiate(self.player._mount)

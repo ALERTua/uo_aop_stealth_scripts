@@ -344,10 +344,10 @@ class Player(Creature):
         # if not container.exists:
         #     log.info(f"Cannot move {item} to nonexistent {container}")
         #     return
-
-        if not container.is_container:
-            log.info(f"Cannot move {item} to non-container {container}")
-            return
+        #
+        # if not container.is_container:
+        #     log.info(f"Cannot move {item} to non-container {container}")
+        #     return
 
         item_container = copy(item.parent)
         if not allow_same_container and item_container == container:
@@ -619,8 +619,9 @@ class Player(Creature):
     def got_bandages(self):
         return self.got_item_type(constants.TYPE_ID_BANDAGE)
 
+    @alive_action
     def loot_container(self, container_id, destination_id=None, delay=constants.LOOT_COOLDOWN,
-                       use_container_before_looting=True):
+                       use_container_before_looting=True, max_open_tries=5):
         container = Container.instantiate(container_id)
         if not container.is_container:
             log.info(f"Cannot loot container {container}. It is not a container.")
@@ -629,9 +630,8 @@ class Player(Creature):
         destination = Container.instantiate(destination_id) if destination_id else self.backpack
         delay = delay or constants.LOOT_COOLDOWN
         if use_container_before_looting:
-            if not self.open_container(container):
-                # return False
-                pass
+            for _ in range(max_open_tries):
+                self.open_container(container)
 
         return EmptyContainer(container.id_, destination.id_, delay)
 
@@ -671,7 +671,7 @@ class Player(Creature):
             return False
 
         corpse = Container.instantiate(corpse_id, omit_cache=True)
-        if skip_innocent and corpse.innocent:
+        if skip_innocent and corpse.innocent:  # todo: self corpse allow
             log.info(f"Skipping innocent corpse {corpse}")
             return
 
@@ -737,6 +737,7 @@ class Player(Creature):
         if output:
             return output[0]
 
+    @alive_action
     def cut_corpse(self, corpse_or_id, cutting_tool=None):  # todo: notoriety check
         corpse = Container.instantiate(corpse_or_id)  # todo: corpse entity
         if not corpse.exists:
