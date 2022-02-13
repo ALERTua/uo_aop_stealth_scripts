@@ -1,4 +1,5 @@
 import atexit
+import random
 import signal
 from copy import copy
 from functools import wraps
@@ -14,7 +15,7 @@ from .base_weapon import WeaponBase, GenericWeapon
 from .container import Container
 from .item import Item
 from .mob import Mob
-from .player import Player, alive_action
+from .player import Player, alive_action, bandage_cd
 
 BANK_COORDS = (2512, 556)
 HEALER_COORDS = constants.COORDS_MINOC_HEALER
@@ -156,7 +157,8 @@ class ScriptBase:
             if not isinstance(ranged_weapon, WeaponBase):
                 ranged_weapon = GenericWeapon.instantiate(ranged_weapon)
         i = 0
-        while mob.alive and (i := i + 1) < 400:
+        max_i = 400
+        while mob.alive and (i := i + 1) < max_i:
             # noinspection PyProtectedMember
             if self.player._mount == mob.id_:
                 break
@@ -184,8 +186,8 @@ class ScriptBase:
                     pass  # log.debug(f"Won't engage {mob} that is already at distance {mob.distance}")
             check_health_func()  # script_check_health in scripts
             self.player.attack(mob.id_)
-            log.info(f"({self.player.hp}/{self.player.max_hp}) "
-                     f"Fight with ({mob.hp}/{mob.max_hp}){mob} at range {mob.distance}")
+            log.info(f"({i}/{max_i}) [{self.player.hp}/{self.player.max_hp}] "
+                     f"Fight with [{mob.hp}/{mob.max_hp}]{mob} at range {mob.distance}")
             tools.result_delay()
         if remount and self.player.unmounted:
             # noinspection PyProtectedMember
@@ -331,6 +333,7 @@ class ScriptBase:
         log.info(f"Resurrecting and returning")
         self._processed_mobs = []
         while self.player.dead:
+            self.player.war_mode = False
             log.info(f"Moving to healer {HEALER_COORDS}")
             self.player.move(*HEALER_COORDS, accuracy=0)
         reagent_types = [constants.TYPE_ID_REAGENT_MR, constants.TYPE_ID_REAGENT_BM, constants.TYPE_ID_REAGENT_BP]
@@ -363,6 +366,9 @@ class ScriptBase:
                         self.disconnect()
                         quit()
 
+                if self.player.need_heal_bandage and (bank_bandage := self.player.find_type(
+                        constants.TYPE_ID_BANDAGE, self.player.bank_container)):
+                    self.player.use_object_on_object(bank_bandage, self.player)
                 rune = self.player.find_type(constants.TYPE_ID_RUNE, bank)
                 if rune:
                     log.info(f"Casting Recall @ {rune}")
@@ -485,20 +491,31 @@ class ScriptBase:
         self.check_bandages()
         self.rearm_from_container()
         self.eat()
+        self.heal_from_container(container)
         self._processed_mobs = []
         self.report_stats()
+
+    @alive_action
+    def heal_from_container(self, container=None):
+        container = container or self.loot_container
+        if self.player.need_heal_bandage and (bandage := self.player.find_type(constants.TYPE_ID_BANDAGE, container)):
+            bandage_cd(self.player.use_object_on_object)(bandage, self.player)
 
     def check_health(self, resurrect=False):
         if self.player.dead:
             # noinspection PyProtectedMember
             tools._delay(15000)  # in case of false-positive at relogin
             if self.player.dead:
+                tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}. '
+                                       f'Resurrecting.')
+                creatures = self.player.find_creatures(distance=30, path_distance=False)
+                creatures = [i for i in creatures if i.name and i != self.player]
+                creatures_str = ", ".join([f"{'Human' if c.human else 'Non-Human'} {c}" for c in creatures])
+                creatures_report = f"Creatures nearby: {creatures_str}"
+                tools.telegram_message(creatures_report)
                 if resurrect:
-                    tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}. '
-                                           f'Resurrecting.')
                     self.resurrect()
                 else:
-                    tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}')
                     self.player.move(*constants.COORDS_MINOC_HEALER)
                     self.quit()
 
@@ -628,30 +645,37 @@ class ScriptBase:
         return output
 
     @alive_action
-    def rearm_from_container(self, weapon_type_ids=None, container_id=None):
+    def rearm_from_container(self, weapon_type_ids=None, shield_type_ids=None, container_id=None):
         if self.player.weapon_equipped:
             return
 
         container_id = container_id or self.loot_container
         container = Container.instantiate(container_id, force_class=True)
-        log.info(f"Rearming from {container}")
-        weapon_type_ids = weapon_type_ids or constants.TYPE_IDS_WEAPONS
-        if not weapon_type_ids:
-            return
-
         if not container.exists or not container.is_container:
             return
 
-        for weapon_type_id in weapon_type_ids:
-            if self.player.weapon_equipped:
-                break
+        log.info(f"Rearming from {container}")
+        arms = []
+        weapon_type_ids = weapon_type_ids or constants.TYPE_IDS_MELEE_WEAPONS
+        if weapon_type_ids:
+            arms.append(weapon_type_ids)
 
-            found_weapon = self.player.find_types_container(weapon_type_id, container_ids=container, recursive=True)
-            if not found_weapon:
-                continue
+        shield_type_ids = shield_type_ids or constants.TYPE_IDS_SHIELDS
+        if shield_type_ids:
+            arms.append(shield_type_ids)
 
-            self.player.equip_object(found_weapon[0], stealth.RhandLayer())  # todo: random.choice
-            tools.result_delay()
+        for arm in arms:
+            for type_id in arm:
+                # if self.player.weapon_equipped:
+                #     break
+
+                found_weapon = self.player.find_types_container(type_id, container_ids=container, recursive=True)
+                if not found_weapon:
+                    continue
+
+                found_weapon = random.choice(found_weapon)
+                self.player.equip_object(found_weapon, stealth.RhandLayer())
+                tools.result_delay()
 
     @alive_action
     def check_weapon(self, max_weapon_search_distance=20):

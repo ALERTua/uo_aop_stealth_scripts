@@ -1,6 +1,6 @@
 import random
 from collections import namedtuple
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from copy import copy
 from functools import wraps, lru_cache
 from typing import List
@@ -332,7 +332,7 @@ class Player(Creature):
     @alive_action
     @drag_cd
     def move_item(self, item_id, quantity=-1, target_id=None, x=0, y=0, z=0, max_tries=10, allow_same_container=False):
-        if isinstance(item_id, Iterable):
+        if isinstance(item_id, (Iterable, Sequence)):
             item_id = random.choice(item_id)
         # ItemID, Count, MoveIntoID, X, Y, Z
         item = Item.instantiate(item_id)
@@ -481,6 +481,9 @@ class Player(Creature):
                         break
 
                     got_type = Item.instantiate(got_type)
+                    if not got_type.quantity:
+                        continue
+
                     if not self.move_item(got_type, got_type.quantity, container, 0, 0, 0):
                         log.debug(f"Couldn't move {got_type} to {container}. Trying to open the container")
                         self.open_container(container)
@@ -607,11 +610,19 @@ class Player(Creature):
         if self.got_item_type(constants.TYPE_ID_POTION_REFRESH):
             return self._drink_potion(potion_type='refresh', potion_level=level)
 
+    @property
+    def need_heal_bandage(self):
+        return self.hp < self.max_hp - 60
+
+    @property
+    def need_heal_potion(self):
+        return self.hp < self.max_hp - 60
+
     @alive_action
     def bandage_self_if_hurt(self):
-        if self.hp <= self.max_hp * 0.4:
+        if self.need_heal_potion:
             self.drink_potion_heal()
-        if self.hp < self.max_hp - 60:
+        if self.need_heal_bandage:
             # noinspection PyArgumentList
             return self.bandage_self()
 
@@ -639,6 +650,7 @@ class Player(Creature):
                         items_color=None, x=0, y=0, z=0, delay=None):
         if not isinstance(item_types, Iterable):
             item_types = [item_types]
+        item_types = item_types or [-1]
         if items_color is None:
             items_color = -1
         source_container = Container.instantiate(source_container) if source_container else self.backpack
@@ -671,11 +683,11 @@ class Player(Creature):
             return False
 
         corpse = Container.instantiate(corpse_id, omit_cache=True)
-        if skip_innocent and corpse.innocent:  # todo: self corpse allow
+        if not corpse.corpse_of_self and skip_innocent and corpse.innocent:
             log.info(f"Skipping innocent corpse {corpse}")
             return
 
-        if cut_corpse:
+        if not corpse.corpse_of_self and cut_corpse:
             self.move_to_object(corpse)
             self.cut_corpse(corpse_id)
             tools.result_delay()

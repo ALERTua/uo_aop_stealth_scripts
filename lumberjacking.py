@@ -145,13 +145,16 @@ class Lumberjack(ScriptBase):
     def got_hatchet(self):
         return self.hatchet.exists
 
+    @alive_action
     def pick_up_items(self, **kwargs):
         return super().pick_up_items(self.unload_itemids)
 
+    @alive_action
     def process_mobs(self, **kwargs):
         return super().process_mobs(engage=ENGAGE_MOBS, notify_mutated=True, mob_find_distance=MOB_FIND_DISTANCE,
                                     drop_overweight_items=self.drop_types)
 
+    @alive_action
     def move_to_tree(self):
         self._checks()
         tile_type, x, y, z = self.current_tree
@@ -161,6 +164,7 @@ class Lumberjack(ScriptBase):
             self.player.move(x, y, accuracy=LJ_DISTANCE_TO_TREE, running=self.should_run)
             self._checks()
 
+    @alive_action
     def move_to_unload(self, **kwargs):
         self.parse_commands()
         if self.player.path_distance_to(*self.loot_container.xy) > 1:
@@ -209,9 +213,11 @@ class Lumberjack(ScriptBase):
 
         return True
 
+    @alive_action
     def check_bandages(self, **kwargs):
         return self._check_bandages(HOLD_BANDAGES, self.loot_container)
 
+    @alive_action
     def eat(self, **kwargs):
         return super().eat(container_id=self.loot_container)
 
@@ -230,6 +236,7 @@ class Lumberjack(ScriptBase):
             log.debug(f"StatLogging {item}")
             self.script_stats[entry_name] = self.script_stats.get(entry_name, 0) + quantity
 
+    @alive_action
     def unload(self, **kwargs):
         log.info("Unloading")
         self.move_to_unload()
@@ -265,6 +272,7 @@ class Lumberjack(ScriptBase):
         # noinspection PyProtectedMember
         return self.player.got_item_type(constants.TYPE_ID_LOGS)
 
+    @alive_action
     def general_weight_check(self):
         if self.got_logs and self.player.overweight:
             self.unload_and_return()
@@ -275,6 +283,7 @@ class Lumberjack(ScriptBase):
         output = y >= WOOD_ZONE_Y
         return output
 
+    @alive_action
     def jack_tree(self):
         while self.player.overweight:
             self.general_weight_check()
@@ -285,9 +294,11 @@ class Lumberjack(ScriptBase):
         output = stealth.HighJournal()
         return output
 
+    @alive_action
     def check_overweight(self, **kwargs):
         return super().check_overweight(self.drop_types, self.trash_item_ids)
 
+    @alive_action
     def go_woods(self):
         self.check_overweight()
         self.wait_stamina()
@@ -308,6 +319,7 @@ class Lumberjack(ScriptBase):
         if not self.check_hatchet():
             self.unload_and_return()
 
+    @alive_action
     def unload_and_return(self):
         self.player.break_action()
         self.check_overweight()
@@ -316,6 +328,7 @@ class Lumberjack(ScriptBase):
         self.move_to_tree()
         self.lj_i = MAX_LJ_ITERATIONS
 
+    @alive_action
     def engage_mob(self, mob: Mob, **kwargs):
         return super().engage_mob(mob=mob, check_health_func=self.lj_check_health, loot=False, cut=False,
                                   drop_trash_items=True, trash_items=LJ_TRASH)
