@@ -26,6 +26,7 @@ RESET_PROCESSED_MOBS_ON_UNLOAD = True
 MAX_WEAPON_SEARCH_DISTANCE = 20
 CORPSE_FIND_DISTANCE = 20
 MAX_LJ_ITERATIONS = 4  # starting from 0
+MAX_FAIL_SAFE = 30  # starting from 0
 LJ_DISTANCE_TO_TREE = 1
 LJ_CONTAINER_ID = 0x728F3B3B
 LOOT_CONTAINER_OPEN_SUBCONTAINERS = True
@@ -115,6 +116,7 @@ class Lumberjack(ScriptBase):
         self._trees = []
         self._current_tree = None
         self.lj_i = 0
+        self.fail_safe_i = 0
         self.unload_itemids = LJ_LOOT
         self.trash_item_ids = LJ_TRASH
         self.drop_types = [
@@ -353,6 +355,7 @@ class Lumberjack(ScriptBase):
 
     def lumberjack_process(self):
         previous_journal_index = self.jack_tree()
+        self.fail_safe_i = 0
         self.lj_i = 0
         while True:
             highjournal = stealth.HighJournal()
@@ -369,6 +372,7 @@ class Lumberjack(ScriptBase):
                 for i in range(trees_quantity):
                     self.tree_depleeted()
                 previous_journal_index = self.jack_tree()
+                self.fail_safe_i = 0
                 self.lj_i = 0
                 continue
 
@@ -376,6 +380,7 @@ class Lumberjack(ScriptBase):
             if successes:
                 previous_journal_index = highjournal
                 self.lj_i = 0
+                self.fail_safe_i = 0
 
             errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
             if errors:
@@ -386,10 +391,15 @@ class Lumberjack(ScriptBase):
                     self.lj_i = MAX_LJ_ITERATIONS
                 previous_journal_index = self.jack_tree()
                 self.lj_i = 0
+                self.fail_safe_i = 0
                 continue
 
             self._checks(loot_corpses=False)
             self.lj_i += 1
+            self.fail_safe_i += 1
+            if self.fail_safe_i > MAX_FAIL_SAFE:
+                log.warning(f"Failsafe: {self.fail_safe_i}. Reconnecting")
+                stealth.Disconnect()
             if self.lj_i > MAX_LJ_ITERATIONS:
                 previous_journal_index = self.jack_tree()
                 self.lj_i = 0
@@ -397,8 +407,11 @@ class Lumberjack(ScriptBase):
             line_contents = ''
             if journal_contents:
                 line_contents = f" : {len(journal_contents)} : {journal_contents[-1].text_clean}"
+            fail_safe_str = ''
+            if self.fail_safe_i > MAX_FAIL_SAFE * 0.75:
+                fail_safe_str = f' ({self.fail_safe_i}/{MAX_FAIL_SAFE}) '
             log.info(f"{len(self._trees)}/{len(LJ_SPOTS)} {self.player.weight:>3}/{self.player.max_weight} "
-                     f"{self.lj_i}/{MAX_LJ_ITERATIONS + 1}{line_contents}")
+                     f"{self.lj_i}/{MAX_LJ_ITERATIONS + 1}{fail_safe_str}{line_contents}")
             stealth.Wait(constants.USE_COOLDOWN / 6)
 
     @condition(LOOT_CORPSES)
