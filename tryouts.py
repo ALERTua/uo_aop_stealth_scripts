@@ -10,7 +10,7 @@ def main():
     log.info('Start')
     old_bowcraft = stealth.GetSkillValue('bowcraft')
     log.info(f"Initing with bowcraft {old_bowcraft}")
-    while (bowcraft := stealth.GetSkillValue('bowcraft')) < 90.0:
+    while (bowcraft := stealth.GetSkillValue('bowcraft')) < 100:
         if old_bowcraft != bowcraft:
             log.info(f"Bowcraft changed to {bowcraft}")
         old_bowcraft = bowcraft
