@@ -177,8 +177,8 @@ class Lumberjack(ScriptBase):
             self.player.move_to_object(self.loot_container, accuracy=1)
             log.info("Moving to unload done")
         tools.ping_delay()
-        if self.loot_container.is_empty:
-            self.player.open_container(self.loot_container)
+        # if self.loot_container.is_empty:
+        self.player.open_container(self.loot_container)
         subcontainers = LOOT_CONTAINER_OPEN_SUBCONTAINERS
         if subcontainers:
             if isinstance(subcontainers, Iterable):
@@ -203,11 +203,13 @@ class Lumberjack(ScriptBase):
         container_hatchet = self.player.find_types_container(
             constants.TYPE_ID_HATCHET, container_ids=self.loot_container, recursive=True)
         if not container_hatchet:
-            todo = stealth.GetFindedList()
-            log.info("WARNING! NO SPARE HATCHETS FOUND!")
-            tools.telegram_message(f"{self.player}: No hatchets found: {todo}")
-            self.quit()
-            return
+            self.player.open_container(self.loot_container)
+            if not container_hatchet:
+                todo = stealth.GetFindedList()
+                log.info("WARNING! NO SPARE HATCHETS FOUND!")
+                tools.telegram_message(f"{self.player}: No hatchets found: {todo}")
+                self.quit()
+                return
 
         while not self.got_hatchet and not self.player.move_item(container_hatchet):
             log.info("Grabbing a Hatchet")

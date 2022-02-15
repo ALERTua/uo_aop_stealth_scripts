@@ -260,7 +260,7 @@ class Player(Creature):
         return False
 
     @container_cd
-    def open_container(self, container, max_tries=15):
+    def open_container(self, container, max_tries=15):  # todo: with subcontainers
         container = Container.instantiate(container, force_class=True)
         if self.last_container == container and not container.is_empty:
             return
