@@ -180,10 +180,8 @@ class ScriptBase:
                     rearm = True
 
             else:
-                if mob.distance > 1:
-                    self.player.move(mob.x, mob.y)
-                else:
-                    pass  # log.debug(f"Won't engage {mob} that is already at distance {mob.distance}")
+                while 50 > mob.distance > 1:
+                    self.player.move(mob.x, mob.y, accuracy=1, running=self.player.should_run)
             check_health_func()  # script_check_health in scripts
             self.player.attack(mob.id_)
             log.info(f"({i}/{max_i}) [{self.player.hp}/{self.player.max_hp}] "
@@ -585,7 +583,7 @@ class ScriptBase:
 
     @alive_action
     def process_mobs(self, engage=True, notify_mutated=True, notify_ranged=True, notify_errors=True, loot=True,
-                     mob_find_distance=20, drop_overweight_items=None, ranged=False, check_health_func=None, cut=True,
+                     mob_find_distance=13, drop_overweight_items=None, ranged=False, check_health_func=None, cut=True,
                      ranged_weapon: WeaponBase = None, ranged_unmount=True, ranged_keep_distance=8, path_distance=True,
                      drop_trash_items=True, trash_items=None, creature_types=None, notorieties=None):
         output = False

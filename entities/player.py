@@ -313,17 +313,17 @@ class Player(Creature):
 
         return result
 
-    def move(self, x, y, optimized=True, accuracy=1, running=True):
-        if self.overweight:
+    def move(self, x, y, optimized=True, accuracy=1, running=True, overweight_check=True):
+        if overweight_check and self.overweight:
             log.info(f"{self} Cannot move: overweight")
             return
 
         if x <= 0 or y <= 0:
             return
 
-        while self.paralyzed:
-            log.info(f"Waiting until unParalyzed")
-            tools.result_delay()
+        # while self.paralyzed:  # todo: doesn't work @ AoP
+        #     log.info(f"Waiting until unParalyzed")
+        #     tools.result_delay()
 
         # Xdst, Ydst, Optimized, Accuracy, Running
         result = newMoveXY(x, y, optimized, accuracy, running) or newMoveXY(x, y, optimized, accuracy, running)
