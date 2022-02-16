@@ -6,20 +6,24 @@ from tools.tools import log
 player = Player()
 
 
-def main():
+def wait_for_skill_level(skill_name, level):
     log.info('Start')
-    old_bowcraft = stealth.GetSkillValue('bowcraft')
-    log.info(f"Initing with bowcraft {old_bowcraft}")
-    while (bowcraft := stealth.GetSkillValue('bowcraft')) < 100:
-        if old_bowcraft != bowcraft:
-            log.info(f"Bowcraft changed to {bowcraft}")
-        old_bowcraft = bowcraft
+    old_skill = stealth.GetSkillValue(skill_name)
+    log.info(f"Initing with {old_skill}")
+    while (skill := stealth.GetSkillValue(skill_name)) < level:
+        if old_skill != skill:
+            log.info(f"Skill changed to {skill}")
+        old_skill = skill
         tools._delay(60000)
-    log.info(f'Done. Bowcraft is now {bowcraft}')
+    log.info(f'Done. Skill is now {skill}')
     stealth.SetARStatus(False)
     stealth.Disconnect()
     stealth.CorrectDisconnection()
     exit()
+
+    
+def main():
+    wait_for_skill_level('carpentry', 60)
 
 
 if __name__ == '__main__':
