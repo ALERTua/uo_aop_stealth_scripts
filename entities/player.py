@@ -411,7 +411,7 @@ class Player(Creature):
 
     @use_cd
     def use_object(self, obj, announce=True):
-        return self._use_object(obj=obj, announce=announce)
+        self._use_object(obj=obj, announce=announce)
 
     def _use_object(self, obj, announce=True):
         obj = Object.instantiate(obj)
@@ -425,7 +425,7 @@ class Player(Creature):
 
         if announce:
             log.info(f"Using {obj}")
-        return UseObject(obj.id_)
+        UseObject(obj.id_)
 
     @alive_action
     def use_object_on_object(self, obj, target):
@@ -688,8 +688,8 @@ class Player(Creature):
             log.info(f"Skipping innocent corpse {corpse}")
             return
 
+        self.move_to_object(corpse)
         if not corpse.corpse_of_self and cut_corpse:
-            self.move_to_object(corpse)
             self.cut_corpse(corpse_id)
             tools.result_delay()
         self.loot_container(corpse)
