@@ -390,7 +390,7 @@ class ScriptBase:
             log.info("Moving to unload")
             self.wait_stamina()
             result = self.player.move_to_object(loot_container, accuracy=0, running=self.should_run)
-            log.info(f"Moving to unload result: {result}")
+            log.debug(f"Moving to unload result: {result}")
         tools.ping_delay()
         self.player.open_container(loot_container)
 

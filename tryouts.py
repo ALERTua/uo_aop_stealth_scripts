@@ -21,7 +21,7 @@ def wait_for_skill_level(skill_name, level):
     stealth.CorrectDisconnection()
     exit()
 
-    
+
 def main():
     wait_for_skill_level('carpentry', 60)
 

@@ -397,11 +397,13 @@ class Lumberjack(ScriptBase):
                 continue
 
             self._checks(loot_corpses=False)
-            self.lj_i += 1
             self.fail_safe_i += 1
             if self.fail_safe_i > MAX_FAIL_SAFE:
                 log.warning(f"Failsafe: {self.fail_safe_i}. Reconnecting")
+                self.fail_safe_i = 0
+                self.lj_i = MAX_LJ_ITERATIONS
                 stealth.Disconnect()
+            self.lj_i += 1
             if self.lj_i > MAX_LJ_ITERATIONS:
                 previous_journal_index = self.jack_tree()
                 self.lj_i = 0

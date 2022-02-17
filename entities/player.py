@@ -489,9 +489,10 @@ class Player(Creature):
                         self.open_container(container)
                         continue
 
-                    log.info(f"Moving {got_type} Done")
+                    log.debug(f"Moving {got_type} Done")
 
-    def say(self, text):
+    @staticmethod
+    def say(text):
         return UOSay(text)
 
     @alive_action
