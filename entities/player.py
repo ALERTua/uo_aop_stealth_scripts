@@ -357,8 +357,14 @@ class Player(Creature):
         i = 0
         log.info(f"Moving {item} to {container}.")
         while not (move_result := MoveItem(item.id_, quantity, container.id_, x, y, z)) \
-                and item.parent == item_container and (i := i + 1) < max_tries:
-            log.info(f".")
+                and item.parent == item_container:
+            i += 1
+            if i > max_tries:
+                log.debug(f"Failsafe {i}. Reconnecting")
+                i = 0
+                tools.reconnect()
+            i_str = '' if i < max_tries * 0.7 else f" {i}/{max_tries}"
+            log.info(f".{i_str}")
             tools.result_delay()
         # log.debug(f"done. Moving success: {move_result}")
         return move_result

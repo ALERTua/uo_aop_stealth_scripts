@@ -2,7 +2,7 @@ import inspect
 import math
 import os
 import traceback
-
+import unicodedata
 import numpy as np
 import requests
 from datetime import datetime
@@ -192,6 +192,15 @@ def coords_array_closest(starting_coords, coords_array):
     deltas = coords - starting_coords
     dist_2 = np.einsum('ij,ij->i', deltas, deltas)
     return dist_2.argsort()
+
+
+def reconnect():
+    stealth.Disconnect()
+    _delay(7000)
+
+
+def is_latin(word):
+    return all(['LATIN' in unicodedata.name(c) for c in word])
 
 
 def __main():
