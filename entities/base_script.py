@@ -10,6 +10,7 @@ import pendulum
 import py_stealth as stealth
 from tools import constants, tools
 from tools.tools import log
+from .statistics import cache as statistics_cache, StatRecord, StatRecorder
 from .base_creature import Creature
 from .base_weapon import WeaponBase, GenericWeapon
 from .container import Container
@@ -120,8 +121,11 @@ class ScriptBase:
     @property
     def script_stats_str(self):
         msg = ''
-        for key, value in self.script_stats.items():
-            msg += f'\n{key}: {value}'
+        if statistics_cache:
+            for type_id, type_id_records in statistics_cache.items():
+                record: StatRecord
+                for color, record in type_id_records.items():
+                    msg += f'\n{record.name} : {record.quantity}'
         return msg
 
     @property
@@ -186,6 +190,7 @@ class ScriptBase:
             self.player.attack(mob.id_)
             log.info(f"({i}/{max_i}) [{self.player.hp}/{self.player.max_hp}] "
                      f"Fight with [{mob.hp}/{mob.max_hp}]{mob} at range {mob.distance}")
+            StatRecorder.record(mob)
             tools.result_delay()
         if remount and self.player.unmounted:
             # noinspection PyProtectedMember

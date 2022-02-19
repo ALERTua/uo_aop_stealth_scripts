@@ -232,13 +232,7 @@ class Lumberjack(ScriptBase):
 
         for item in items:
             items_obj = Item.instantiate(item)
-            type_id = items_obj.type_id
-            color = items_obj.color
-            quantity = items_obj.quantity
-            name = items_obj.name_short
-            entry_name = f"{type_id}({color}){name}"
-            log.debug(f"StatLogging {item}")
-            self.script_stats[entry_name] = self.script_stats.get(entry_name, 0) + quantity
+            StatRecorder.record(items_obj)
 
     @alive_action
     def unload(self, **kwargs):
