@@ -8,6 +8,7 @@ from entities.base_script import ScriptBase, alive_action, condition, stealth
 from entities.container import Container
 from entities.item import Item
 from entities.mob import Mob
+from entities.statistics import StatRecorder
 from entities.weapon import Hatchet
 from tools import constants, tools
 from tools.tools import log
