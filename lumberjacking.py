@@ -161,8 +161,16 @@ class Lumberjack(ScriptBase):
     def move_to_tree(self):
         self._checks()
         tile_type, x, y, z = self.current_tree
+        i = 0
+        max_i = 30
         while self.player.distance_to(x, y) > LJ_DISTANCE_TO_TREE:
-            log.info(f"{len(self._trees)}/{len(LJ_SPOTS)} Moving to the next tree: {self.current_tree}")
+            i += 1
+            if i > max_i:
+                log.info(f"Failsafe {i}. Reconnecting")
+                i = 0
+                tools.reconnect()
+            i_str = '' if i > max_i * 0.7 else f' {i}/{max_i}'
+            log.info(f"{len(self._trees)}/{len(LJ_SPOTS)}{i_str} Moving to the next tree: {self.current_tree}")
             self.wait_stamina(5)
             self.player.move(x, y, accuracy=LJ_DISTANCE_TO_TREE, running=self.should_run)
             self._checks()
@@ -397,7 +405,7 @@ class Lumberjack(ScriptBase):
                 log.warning(f"Failsafe: {self.fail_safe_i}. Reconnecting")
                 self.fail_safe_i = 0
                 self.lj_i = MAX_LJ_ITERATIONS
-                stealth.Disconnect()
+                tools.reconnect()
             self.lj_i += 1
             if self.lj_i > MAX_LJ_ITERATIONS:
                 previous_journal_index = self.jack_tree()
