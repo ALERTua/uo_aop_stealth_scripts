@@ -690,6 +690,7 @@ class Player(Creature):
 
         self.move_to_object(corpse)
         if not corpse.corpse_of_self and cut_corpse:
+            tools._delay(constants.USE_COOLDOWN)  # todo: investigate
             self.cut_corpse(corpse_id)
             tools.result_delay()
         self.loot_container(corpse)
