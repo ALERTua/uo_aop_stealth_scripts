@@ -345,7 +345,7 @@ class Fishing(ScriptBase):
 
                     errors = [e for e in FISHING_ERRORS if any([j.contains(e) for j in journal_contents])]
                     if errors:
-                        log.debug(f"Depletion message detected: {errors[0]}")
+                        # log.debug(f"Depletion message detected: {errors[0]}")
                         self.tile_depleeted()
                         break
 

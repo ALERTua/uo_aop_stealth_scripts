@@ -380,7 +380,7 @@ class Lumberjack(ScriptBase):
 
             errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
             if errors:
-                log.debug(f"{len(self._trees)}/{len(LJ_SPOTS)} Depletion message detected: {errors[0]}")
+                # log.debug(f"{len(self._trees)}/{len(LJ_SPOTS)} Depletion message detected: {errors[0]}")
                 self.tree_depleeted()
                 self._checks()
                 if self.general_weight_check():
