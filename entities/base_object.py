@@ -133,6 +133,10 @@ class Object:
         self._name = value
 
     @property
+    def short_name(self):
+        return self.name_short
+
+    @property
     def name_short(self):
         name = self.name
         if not name:
@@ -141,6 +145,15 @@ class Object:
         short_name = name.split(':')[0].strip()
         short_name = short_name.lstrip('a').strip()
         short_name = short_name.split('made by')[0].strip()
+        if short_name.endswith('s'):
+            pre_s_character = short_name[-2]
+            if tools.is_latin(pre_s_character):
+                if pre_s_character == 's':  # two 's' at the end
+                    short_name = short_name[:-1]
+                else:  # one 's' at the end
+                    pass
+            else:  # russian letter before the last 's'
+                short_name = short_name[:-1]
         return short_name
 
     @property
