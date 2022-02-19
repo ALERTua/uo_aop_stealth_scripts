@@ -10,7 +10,7 @@ class Item(Object):
         self.weight_one = weight
 
     def __str__(self):
-        return f"[{self.__class__.__name__}]({hex(self._id)}){self.quantity}×{self.name}"
+        return f"[{self.__class__.__name__}]({hex(self._id)}){self.quantity}×{self.name_short}"
 
     @property
     def total_weight(self):
