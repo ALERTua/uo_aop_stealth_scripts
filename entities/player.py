@@ -633,7 +633,7 @@ class Player(Creature):
 
     @alive_action
     def loot_container(self, container_id, destination_id=None, delay=constants.LOOT_COOLDOWN,
-                       use_container_before_looting=True, max_open_tries=5):
+                       use_container_before_looting=True, max_open_tries=10):
         container = Container.instantiate(container_id)
         if not container.is_container:
             log.info(f"Cannot loot container {container}. It is not a container.")
