@@ -191,7 +191,6 @@ class ScriptBase:
             self.player.attack(mob.id_)
             log.info(f"({i}/{max_i}) [{self.player.hp}/{self.player.max_hp}] "
                      f"Fight with [{mob.hp}/{mob.max_hp}]{mob} at range {mob.distance}")
-            StatRecorder.record(mob)
             tools.result_delay()
         if remount and self.player.unmounted:
             # noinspection PyProtectedMember
@@ -232,6 +231,7 @@ class ScriptBase:
                              ranged_unmount=ranged_unmount, ranged_keep_distance=ranged_keep_distance)
         log.info(f"Done Engaging {mob}")
         self.player.war_mode = False
+        StatRecorder.record(mob)
         # if not notify_only_mutated or (notify_only_mutated and mob.mutated):
         #     tools.telegram_message(f"{mob} dead", disable_notification=not mob.mutated)
         if loot:
