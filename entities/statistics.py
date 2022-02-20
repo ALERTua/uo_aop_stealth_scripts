@@ -47,8 +47,7 @@ class StatRecorder:
         name = obj.name_short
         type_id = obj.type_id
         color = obj.color
-        if cache.get(type_id, None) is None:
-            cache[type_id] = {}
+        cache.setdefault(type_id, {})
 
         if cache[type_id].get(color, None) is None:
             stat_obj = StatRecord(name=name, type_id=type_id, color=color, quantity=quantity, obj=obj)

@@ -101,16 +101,16 @@ def telegram_message(msg, chat_id=None, disable_notification=False, token=None):
     return requests.post(url=url, json=data)
 
 
-def _delay(delay=250):
+def delay(delay=250):
     return stealth.Wait(delay)
 
 
 def ping_delay():
-    return _delay(server_ping_average() + 10)
+    return delay(server_ping_average() + 10)
 
 
 def result_delay():
-    return _delay(server_ping_average() + 100)
+    return delay(server_ping_average() + 100)
 
 
 def string_in_strings(str_, strings):
@@ -196,7 +196,7 @@ def coords_array_closest(starting_coords, coords_array):
 
 def reconnect():
     stealth.Disconnect()
-    _delay(7000)
+    delay(7000)
 
 
 def is_latin(word):

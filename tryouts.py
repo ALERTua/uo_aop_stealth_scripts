@@ -14,7 +14,7 @@ def wait_for_skill_level(skill_name, level):
         if old_skill != skill:
             log.info(f"Skill changed to {skill}")
         old_skill = skill
-        tools._delay(60000)
+        tools.delay(60000)
     log.info(f'Done. Skill is now {skill}')
     stealth.SetARStatus(False)
     stealth.Disconnect()

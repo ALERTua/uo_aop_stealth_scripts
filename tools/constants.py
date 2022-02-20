@@ -45,7 +45,7 @@ DRAG_COOLDOWN = 250 + tools.server_ping_average() + 10
 LOOT_COOLDOWN = DRAG_COOLDOWN
 USE_COOLDOWN = 3000 + tools.server_ping_average() + 10
 MINING_COOLDOWN = USE_COOLDOWN
-BANDAGE_COOLDOWN = 8000 + tools.server_ping_average() + 10
+BANDAGE_COOLDOWN = 8000 + tools.server_ping_average() + 100  # due to the last healing pulse at the end
 POTION_COOLDOWN = 8000 + tools.server_ping_average() + 10
 
 # WEIGHTS

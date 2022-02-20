@@ -20,7 +20,7 @@ class Container(Item):
 
     @property
     def corpse_of_self(self):
-        return f'corpse of {stealth.CharName()}' in self.name
+        return f'corpse of {stealth.CharName()}'.lower() in self.name.lower()  # potential exploit
 
 
 if __name__ == '__main__':

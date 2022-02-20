@@ -171,7 +171,7 @@ class Lumberjack(ScriptBase):
                 tools.reconnect()
             i_str = '' if i > max_i * 0.7 else f' {i}/{max_i}'
             log.info(f"{len(self._trees)}/{len(LJ_SPOTS)}{i_str} Moving to the next tree: {self.current_tree}")
-            self.wait_stamina(5)
+            self.wait_stamina(0.1)
             self.player.move(x, y, accuracy=LJ_DISTANCE_TO_TREE, running=self.should_run)
             self._checks()
 
@@ -313,7 +313,7 @@ class Lumberjack(ScriptBase):
         self.player.move(*WOOD_ENTRANCE)
         self.player.open_backpack()
         log.info(f"Going to the woods done")
-        self.wait_stamina(5)
+        self.wait_stamina(0.1)
 
     def check_health(self, **kwargs):
         return super().check_health(resurrect=RESURRECT_AND_RETURN)

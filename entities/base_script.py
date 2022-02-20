@@ -133,15 +133,16 @@ class ScriptBase:
         return self.__class__.__name__
 
     @alive_action
-    def wait_stamina(self, threshold=20):
-        if self.player.stamina < threshold:
-            log.info(f"Waiting stamina at least {threshold}")
+    def wait_stamina(self, threshold=0.2):
+        stamina_threshold = self.player.max_stamina * threshold
+        if self.player.stamina < stamina_threshold:
+            log.info(f"Waiting stamina at least {stamina_threshold}")
         else:
             return
 
-        while self.player.alive and self.player.stamina < threshold:
+        while self.player.alive and self.player.stamina < stamina_threshold:
             tools.result_delay()
-        log.info(f"Stamina reached {threshold}")
+        log.info(f"Stamina reached {stamina_threshold}")
 
     @alive_action
     def pick_up_items(self, type_ids=None):
@@ -417,7 +418,7 @@ class ScriptBase:
                 break
 
             log.info(f"Moving to spot: {spot_x} {spot_y}")
-            self.wait_stamina(5)
+            self.wait_stamina(0.1)
             if not self.player.move(spot_x, spot_y, accuracy=accuracy, running=self.should_run):
                 self.player.move(spot_x, spot_y, accuracy=accuracy + 1, running=self.should_run)
             self.checks()
@@ -507,7 +508,7 @@ class ScriptBase:
     def check_health(self, resurrect=False):
         if self.player.dead:
             # noinspection PyProtectedMember
-            tools._delay(15000)  # in case of false-positive at relogin
+            tools.delay(15000)  # in case of false-positive at relogin
             if self.player.dead:
                 tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}. '
                                        f'Resurrecting.')
@@ -740,7 +741,8 @@ class ScriptBase:
         if self.player.dead:
             return True
 
-        return self.player.near_max_weight is False and self.player.stamina > 10
+        # todo: yes, this should really repend on the running distance...
+        return self.player.near_max_weight is False and self.player.stamina >= self.player.max_stamina * 0.2
 
     def drink_trash_potions(self):
         trash_potions_type_id = constants.TYPE_IDS_POTIONS_TRASH
@@ -748,5 +750,6 @@ class ScriptBase:
             for potion in trash_potions:
                 potion_object = Item.instantiate(potion)
                 log.info(f"Drinking trash potion {potion_object}")
+                # noinspection PyProtectedMember
                 self.player._use_object(potion_object)
-                tools._delay(constants.POTION_COOLDOWN)
+                tools.delay(constants.POTION_COOLDOWN)

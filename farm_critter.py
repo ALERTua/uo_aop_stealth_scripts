@@ -108,7 +108,7 @@ class FarmCritter(ScriptBase):
     def move_to_spot(self):
         self.parse_commands()
         self.check_overweight()
-        self.wait_stamina(5)
+        self.wait_stamina(0.1)
         running = self.player.near_max_weight is False and self.player.stamina > 10
         self.player.move(*self.current_spot, accuracy=0, running=running)
         self.pick_up_items()

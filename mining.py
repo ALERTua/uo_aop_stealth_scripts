@@ -197,7 +197,7 @@ class Miner(ScriptBase):
         self.check_overweight()
         self.player.move(*MINE_ENTRANCE_COORDS)
         log.info(f"Going to the mine done")
-        self.wait_stamina(5)
+        self.wait_stamina(0.1)
 
     @property
     def mining_spots(self):
@@ -291,7 +291,7 @@ class Miner(ScriptBase):
         _ = self.direction
         while self.player.xy != self.mining_spot:
             log.info(f"Moving to the next mining spot: {self.mining_spot}")
-            self.wait_stamina(5)
+            self.wait_stamina(0.1)
             self.player.move(*self.mining_spot, running=self.should_run, accuracy=0)
             self._checks()
 

@@ -265,13 +265,10 @@ class Player(Creature):
         if self.last_container == container and not container.is_empty:
             return
 
-        # if self.use_cooldown < pendulum.now():
-        #     left = pendulum.now()
-        #     tools._delay(left)
         # if not container.exists:
         #     log.info(f"Cannot open non-existing {container}")
         #     return
-        #
+
         # if not container.is_container:
         #     log.info(f"Cannot open non-container {container}")
         #     return
@@ -281,7 +278,7 @@ class Player(Creature):
             i = 0
             while not (result := self._open_container(container)) and (i := i + 1) < max_tries:
                 # noinspection PyProtectedMember
-                tools._delay(constants.USE_COOLDOWN)
+                tools.delay(constants.USE_COOLDOWN)
 
             if i >= max_tries:
                 log.info(f"Couldn't open {container} after {max_tries} tries")
@@ -336,9 +333,9 @@ class Player(Creature):
             item_id = random.choice(item_id)
         # ItemID, Count, MoveIntoID, X, Y, Z
         item = Item.instantiate(item_id)
-        # if not item.exists:
-        #     log.info(f"Cannot move nonexistent {item}")
-        #     return
+        if not item.exists:
+            log.info(f"Cannot move nonexistent {item}")
+            return
 
         container = Container.instantiate(target_id, force_class=True) if target_id else self.backpack
         # if not container.exists:
@@ -412,6 +409,7 @@ class Player(Creature):
         while not (drop_result := Drop(item.id_, quantity, x, y, z)) and item.parent == item_container \
                 and (i := i + 1) < max_tries:
             log.info(f".")
+        tools.result_delay()
         log.debug(f"done. Dropping success: {drop_result}")
         return drop_result
 
@@ -480,8 +478,6 @@ class Player(Creature):
                 if not got_type:
                     continue
 
-                got_type = Item.instantiate(got_type)
-                log.info(f"Moving {got_type} to {container}")
                 while got_type := stealth.FindType(unload_type):
                     if not got_type:
                         break
@@ -494,8 +490,6 @@ class Player(Creature):
                         log.debug(f"Couldn't move {got_type} to {container}. Trying to open the container")
                         self.open_container(container)
                         continue
-
-                    log.debug(f"Moving {got_type} Done")
 
     @staticmethod
     def say(text):
@@ -555,9 +549,11 @@ class Player(Creature):
 
     @alive_action
     @set_find_distance(1)
-    def find_type_backpack(self, type_id, color_id=None, recursive=True):
+    def find_type_backpack(self, type_id, color_id=None, recursive=True, check_backpack_open=True):
         if color_id is None:
             color_id = -1
+        if check_backpack_open and self.backpack.is_empty:
+            self.open_container(self.backpack)
         return FindTypeEx(type_id, color_id, self.backpack.id_, recursive)
 
     def got_item_type(self, item_type, color_id=None):
@@ -696,7 +692,7 @@ class Player(Creature):
 
         self.move_to_object(corpse)
         if not corpse.corpse_of_self and cut_corpse:
-            tools._delay(constants.USE_COOLDOWN)  # todo: investigate
+            tools.delay(constants.USE_COOLDOWN)  # todo: investigate
             self.cut_corpse(corpse_id)
             tools.result_delay()
         self.loot_container(corpse)

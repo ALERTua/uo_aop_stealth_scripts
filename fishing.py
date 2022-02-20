@@ -267,7 +267,7 @@ class Fishing(ScriptBase):
 
     def tile_depleeted(self):
         self._processed_mobs = []
-        self.wait_stamina(25)
+        self.wait_stamina(0.2)
 
     def cut_fish(self, search_distance=constants.USE_GROUND_RANGE):
         cutting_tool = self.player.corpse_cutting_tool

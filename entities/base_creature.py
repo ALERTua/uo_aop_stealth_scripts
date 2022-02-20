@@ -77,3 +77,7 @@ class Creature(Object):
 
     def path_distance(self, optimized=True, accuracy=1):
         return super().path_distance(optimized=optimized, accuracy=accuracy)
+
+    @property
+    def quantity(self):
+        return 1
