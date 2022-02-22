@@ -101,8 +101,13 @@ def telegram_message(msg, chat_id=None, disable_notification=False, token=None):
     return requests.post(url=url, json=data)
 
 
-def delay(delay=250):
-    return stealth.Wait(delay)
+def delay(ms=250):
+    threshold = 5000
+    if ms >= threshold:
+        log.debug(f"Delay {ms} from {get_prev_function_name()}")
+    stealth.Wait(ms)
+    if ms >= threshold:
+        log.debug(f"Delay {ms} from {get_prev_function_name()} finished")
 
 
 def ping_delay():
