@@ -115,6 +115,9 @@ class ScriptBase:
         elif self._parse_command('stats', journal_lines=journal):
             self._command_add_cooldown('stats')
             return self.report_stats()
+        elif self._parse_command('debug', journal_lines=journal):
+            self._command_add_cooldown('debug')
+            return tools.debug()
 
         self.commands_journal_index = stealth.HighJournal()
 
