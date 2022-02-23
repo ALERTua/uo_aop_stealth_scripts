@@ -522,8 +522,12 @@ class Player(Creature):
 
     @set_find_distance(constants.USE_GROUND_RANGE)
     def find_type(self, type_id, container=None):
-        container = Container.instantiate(container)
-        return FindType(type_id, container.id_)
+        if container is None:
+            container_id = -1
+        else:
+            container = Container.instantiate(container)
+            container_id = container.id_
+        return FindType(type_id, container_id)
 
     def find_type_ground(self, type_id, distance=2):
         output = set_find_distance(distance)(FindType)(type_id, 0)
