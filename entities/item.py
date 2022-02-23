@@ -4,10 +4,30 @@ from tools import constants, tools
 from tools.tools import log
 
 
+def item_poisoned(item_id):
+    item = Item.instantiate(item_id)
+    while True:
+        stealth.CancelWaitTarget()
+        stealth.WaitTargetObject(item.id_)
+        journal_start = stealth.HighJournal()
+        stealth.UseSkill('item identification')
+        tools.delay(constants.SKILL_COOLDOWN)
+        journal_contents = tools.journal(journal_start)
+        fail = [j for j in journal_contents if j.contains(r'.*ничего не можете сказать об этой вещи.*',
+                                                          regexp=True, return_re_value=True)]
+        if not fail:
+            break
+
+    result = [j for j in journal_contents if j.contains(r'.* отравлено .* ядом', regexp=True, return_re_value=True)]
+    output = len(result) != 0
+    return output
+
+
 class Item(Object):
     def __init__(self, _id, weight=None, **kwargs):
         super().__init__(_id, **kwargs)
         self.weight_one = weight
+        self._poisoned = None
 
     def __str__(self):
         return f"[{self.__class__.__name__}]({hex(self._id)}){self.quantity}×{self.name_short}"
@@ -46,6 +66,16 @@ class Item(Object):
         return any(i for i in self._get_click_info()
                    if i.color == LineColor.WHITE
                    and 'secure' in i.text.lower())
+
+    @property
+    def poisoned(self):
+        if self._poisoned is None:
+            self._poisoned = item_poisoned(self._id)
+        return self._poisoned
+
+    @poisoned.setter
+    def poisoned(self, value):
+        self._poisoned = value
 
 
 if __name__ == '__main__':
