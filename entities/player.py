@@ -260,9 +260,9 @@ class Player(Creature):
         return False
 
     @container_cd
-    def open_container(self, container, max_tries=15):  # todo: with subcontainers
+    def open_container(self, container, max_tries=15, subcontainers=False):  # todo: with subcontainers
         container = Container.instantiate(container, force_class=True)
-        if self.last_container == container and not container.is_empty:
+        if not subcontainers and self.last_container == container and not container.is_empty:
             return
 
         # if not container.exists:
@@ -285,6 +285,18 @@ class Player(Creature):
                 return False
 
             log.debug(f"Successfuly opened {container}")
+
+        if subcontainers:
+            log.info(f"Opening subcontainers for {container}")
+            # subcontainers = self.find_types_container(constants.TYPE_IDS_CONTAINER, container_ids=container,
+            #                                           recursive=True)
+            _ = stealth.FindType(-1, container.id_)
+            all_items = [Item.instantiate(i) for i in stealth.GetFoundList() if i]
+            subcontainers = [i for i in all_items if i and i.is_container]
+            for container in subcontainers:
+                if container.is_empty:
+                    self.open_container(container)
+
         return True
 
     @alive_action

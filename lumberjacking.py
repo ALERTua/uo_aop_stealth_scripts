@@ -187,17 +187,7 @@ class Lumberjack(ScriptBase):
             log.info("Moving to unload done")
         tools.ping_delay()
         # if self.loot_container.is_empty:
-        self.player.open_container(self.loot_container)
-        subcontainers = LOOT_CONTAINER_OPEN_SUBCONTAINERS
-        if subcontainers:
-            if isinstance(subcontainers, Iterable):
-                subcontainers = [Container.instantiate(i, force_class=True) for i in subcontainers]
-            else:
-                subcontainers = self.player.find_types_container(
-                    constants.TYPE_IDS_CONTAINER, container_ids=self.loot_container, recursive=True)
-            for container in subcontainers:
-                if container.is_empty:
-                    self.player.open_container(container)
+        self.player.open_container(self.loot_container, subcontainers=LOOT_CONTAINER_OPEN_SUBCONTAINERS)
 
     @alive_action
     def check_hatchet(self):
