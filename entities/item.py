@@ -35,7 +35,7 @@ class Item(Object):
     @property
     def total_weight(self):
         if not self.weight_one:
-            log.info(f"Cannot get {self} total weight. Weight of one is unknown")
+            # log.info(f"Cannot get {self} total weight. Weight of one is unknown")
             return
 
         return self.quantity * self.weight_one
