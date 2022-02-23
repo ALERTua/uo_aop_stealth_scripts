@@ -62,8 +62,8 @@ class Object:
                 from entities.container import Container
                 cls_ = Container
             elif type_id in constants.TYPE_IDS_WEAPONS:
-                from entities.base_weapon import GenericWeapon
-                cls_ = GenericWeapon
+                from entities.base_weapon import Weapon
+                cls_ = Weapon
             elif type_id in constants.TYPE_IDS_CREATURE:
                 from entities.base_creature import Creature
                 cls_ = Creature

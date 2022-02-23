@@ -12,7 +12,7 @@ from tools import constants, tools
 from tools.tools import log
 from .statistics import cache as statistics_cache, StatRecord, StatRecorder
 from .base_creature import Creature
-from .base_weapon import WeaponBase, GenericWeapon
+from .base_weapon import WeaponBase, Weapon
 from .container import Container
 from .item import Item
 from .mob import Mob
@@ -163,7 +163,7 @@ class ScriptBase:
         remount = False
         if ranged:
             if not isinstance(ranged_weapon, WeaponBase):
-                ranged_weapon = GenericWeapon.instantiate(ranged_weapon)
+                ranged_weapon = Weapon.instantiate(ranged_weapon)
         i = 0
         max_i = 400
         while mob.alive and (i := i + 1) < max_i:

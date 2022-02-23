@@ -4,7 +4,7 @@ from copy import copy
 
 import pendulum
 
-from entities.base_weapon import GenericWeapon
+from entities.base_weapon import Weapon
 from entities.container import Container
 from entities.item import Item
 from entities.weapon import FishingPole
@@ -194,7 +194,7 @@ class Fishing(ScriptBase):
         if not weapons:
             return
 
-        return GenericWeapon.instantiate(weapons[0])
+        return Weapon.instantiate(weapons[0])
 
     def process_mobs(self, **kwargs):
         return super(Fishing, self).process_mobs(
@@ -374,7 +374,7 @@ class Fishing(ScriptBase):
         super().unload(self.unload_itemids, self.loot_container)
         if not self.player.corpse_cutting_tool:
             self._unload_get_item(constants.TYPE_IDS_CORPSE_CUT_TOOLS, self.loot_container,
-                                  condition=lambda i: GenericWeapon.instantiate(i).magic)
+                                  condition=lambda i: Weapon.instantiate(i).magic)
 
     def start(self):
         self._start_time = pendulum.now()

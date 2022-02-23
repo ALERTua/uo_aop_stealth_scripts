@@ -62,6 +62,6 @@ class RightHandWeapon(WeaponBase):
         raise NotImplementedError()
 
 
-class GenericWeapon(RightHandWeapon):
+class Weapon(RightHandWeapon):
     def type_id(self):
         return stealth.GetType(self.id_)

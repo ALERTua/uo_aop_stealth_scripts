@@ -13,7 +13,7 @@ from entities.item import Item
 from py_stealth import *
 from tools import constants, tools
 from .base_creature import Creature
-from .base_weapon import WeaponBase, GenericWeapon
+from .base_weapon import WeaponBase, Weapon
 from .container import Container
 from tools.tools import log
 
@@ -748,7 +748,7 @@ class Player(Creature):
         if not output:
             return
 
-        output = [GenericWeapon.instantiate(i) for i in output]
+        output = [Weapon.instantiate(i) for i in output]
         output.sort(key=lambda _: _.magic)
         if output:
             return output[0]
