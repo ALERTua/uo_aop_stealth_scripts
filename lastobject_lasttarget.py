@@ -8,6 +8,7 @@ class LastObjectLastTarget(ScriptBase):
         super().__init__()
 
     def start(self):
+        super(type(self), self).start()
         last_object = self.player.last_object
         last_target = self.player.last_target
         while last_object.exists and last_target.exists:

@@ -438,8 +438,7 @@ class Lumberjack(ScriptBase):
         return super().rearm_from_container(container_id=self.loot_container)
 
     def start(self):
-        log.info(f"Starting {self.scenario_name}")
-        self._start_time = pendulum.now()
+        super(type(self), self).start()
         self.check_health()
         self.general_weight_check()
         dist_to_container = self.player.path_distance_to(*self.loot_container.xy)

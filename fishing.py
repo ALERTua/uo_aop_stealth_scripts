@@ -377,7 +377,7 @@ class Fishing(ScriptBase):
                                   condition=lambda i: Weapon.instantiate(i).magic)
 
     def start(self):
-        self._start_time = pendulum.now()
+        super(type(self), self).start()
         self.check_overweight(self.unload_itemids, self.trash_item_ids)
         dist_to_container = self.player.path_distance_to_object(self.loot_container)
         if dist_to_container < 20:

@@ -67,6 +67,10 @@ class ScriptBase:
         log.info(f"{self} atexit.")
         self.print_script_stats()
 
+    def start(self):
+        log.info(f"Starting {self.scenario_name}")
+        self._start_time = pendulum.now()
+
     def print_script_stats(self):
         log.info(f"{self} stats:")
         msg = self.script_stats_str

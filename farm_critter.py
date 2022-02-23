@@ -169,7 +169,7 @@ class FarmCritter(ScriptBase):
         self.spot_depleeted()
 
     def start(self):
-        self._start_time = pendulum.now()
+        super(type(self), self).start()
         self.general_weight_check()
         dist_to_container = stealth.Dist(self.player.x, self.player.y, *LOOT_CONTAINER_COORDS)
         if dist_to_container < 20:

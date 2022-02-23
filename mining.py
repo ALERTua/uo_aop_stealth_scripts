@@ -424,9 +424,7 @@ class Miner(ScriptBase):
         return super().rearm_from_container(container_id=MINING_CONTAINER_ID)
 
     def start(self):
-        # stealth.SetEventProc('evtimer1', self.callback_command_parser)
-        log.info(f"Starting {self.scenario_name}")
-        self._start_time = pendulum.now()
+        super(type(self), self).start()
         dist_to_container = self.player.path_distance_to(*MINING_CONTAINER_COORDS)
         if dist_to_container < 20:
             self.move_to_unload()
