@@ -366,9 +366,9 @@ class Lumberjack(ScriptBase):
                 log.info(f"Skipping {trees_quantity} trees")
                 for i in range(trees_quantity):
                     self.tree_depleeted()
-                previous_journal_index = self.jack_tree()
                 self.fail_safe_i = 0
                 self.lj_i = 0
+                previous_journal_index = self.jack_tree()
                 continue
 
             successes = [e for e in LJ_SUCCESS_MESSAGES if any([j.contains(e) for j in journal_contents])]

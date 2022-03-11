@@ -195,10 +195,10 @@ class ScriptBase:
                 while 50 > mob.distance > 1:
                     self.player.move(mob.x, mob.y, accuracy=1, running=self.player.should_run)
             check_health_func()  # script_check_health in scripts
+            tools.result_delay()
             self.player.attack(mob.id_)
             log.info(f"({i}/{max_i}) [{self.player.hp}/{self.player.max_hp}] "
                      f"Fight with [{mob.hp}/{mob.max_hp}]{mob} at range {mob.distance}")
-            tools.result_delay()
         if remount and self.player.unmounted:
             # noinspection PyProtectedMember
             mount = Creature.instantiate(self.player._mount)
@@ -405,7 +405,7 @@ class ScriptBase:
             result = self.player.move_to_object(loot_container, accuracy=0, running=self.should_run)
             log.debug(f"Moving to unload result: {result}")
         tools.ping_delay()
-        self.player.open_container(loot_container)
+        self.player.open_container(loot_container, subcontainers=True)
 
     def record_stats(self):
         pass
@@ -589,8 +589,8 @@ class ScriptBase:
     def _find_mobs(self, mob_find_distance=20, notorieties=None, creature_types=None, path_distance=True):
         output = self.player.find_creatures(
             distance=mob_find_distance, notorieties=notorieties, creature_types=creature_types,
-            condition=lambda i: i.type_id is not None and i not in self._processed_mobs and not i.dead and not i.mount
-                                and not i.human,
+            condition=lambda i: i.type_id is not None and i not in self._processed_mobs and not i.dead and not i.human
+                                and i.alive and not i.dead and not i.mount,
             path_distance=path_distance)
         return output
 
@@ -609,7 +609,13 @@ class ScriptBase:
                 # noinspection PyProtectedMember
                 mob = Mob.instantiate(creature.id_, omit_cache=True, force_class=True)
                 if mob in self._processed_mobs:
-                    log.debug(f"Skipping processed {mob}")
+                    if mob.name:
+                        log.debug(f"Skipping processed {mob}")
+                    continue
+
+                if not mob.name:
+                    log.debug(f"Skipping mob without a name {mob}")
+                    self._processed_mobs.append(mob)
                     continue
 
                 # noinspection PyProtectedMember

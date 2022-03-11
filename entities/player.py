@@ -602,19 +602,23 @@ class Player(Creature):
                 else:
                     log.debug(f"Smelt successful: {ore_quantity_before} x {ore}")
 
+    def _bandage_self(self):
+        cmd = "'pc heal self"
+        log.info(f"Healing self with {cmd}")
+        self.say(cmd)
+
     @alive_action
     @bandage_cd
     def bandage_self(self):
         if self.hp < self.max_hp:
-            cmd = "'pc heal self"
-            log.info(f"Healing self with {cmd}")
-            self.say(cmd)
+            self._bandage_self()
 
     @bandage_cd
     def _drink_potion(self, potion_type, potion_level=None):
         if potion_level is None:
             for i in range(5, 0, -1):
                 self._drink_potion(potion_type=potion_type, potion_level=i)
+            self._drink_potion(potion_type=potion_type, potion_level='')
             return
 
         cmd = f"'pc quaf {potion_type} {potion_level}"
@@ -622,11 +626,11 @@ class Player(Creature):
         self.say(cmd)
 
     def drink_potion_heal(self, level=None):
-        if self.got_item_type(constants.TYPE_ID_POTION_HEAL):
+        if self.find_type_backpack(constants.TYPE_ID_POTION_HEAL, recursive=False):
             return self._drink_potion(potion_type='heal', potion_level=level)
 
     def drink_potion_refresh(self, level=None):
-        if self.got_item_type(constants.TYPE_ID_POTION_REFRESH):
+        if self.find_type_backpack(constants.TYPE_ID_POTION_REFRESH, recursive=False):
             return self._drink_potion(potion_type='refresh', potion_level=level)
 
     @property
@@ -710,7 +714,7 @@ class Player(Creature):
         if not corpse.corpse_of_self and cut_corpse:
             tools.delay(constants.USE_COOLDOWN)  # todo: investigate
             self.cut_corpse(corpse_id)
-            tools.result_delay()
+            tools.delay(constants.USE_COOLDOWN)  # todo: investigate
         self.loot_container(corpse)
         if drop_trash_items:
             # noinspection PyArgumentList

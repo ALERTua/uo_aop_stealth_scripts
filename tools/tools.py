@@ -115,7 +115,7 @@ def ping_delay():
 
 
 def result_delay():
-    return delay(server_ping_average() * 2 + 100)
+    return delay(server_ping_average() * 4)
 
 
 def string_in_strings(str_, strings):

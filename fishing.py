@@ -2,8 +2,6 @@ import random
 import re
 from copy import copy
 
-import pendulum
-
 from entities.base_weapon import Weapon
 from entities.container import Container
 from entities.item import Item
@@ -25,7 +23,7 @@ ROAM_COORDS = [
     (2473, 265),
     (2464, 254),
 ]
-MOUNT_ID = 0x076C4894
+MOUNT_ID = 0x076FB1F9
 FISHING_MAX_RANGE = 5
 MAX_RANGE = 25
 MOB_FIND_DISTANCE = 40
@@ -43,11 +41,11 @@ RANGED_UNMOUNT = True
 RANGED_KEEP_DISTANCE = 8
 LOOT_CORPSES = True
 CUT_CORPSES = True
-MAX_ITERATIONS = 15
+MAX_ITERATIONS = 4  # starting from 0
+MAX_FAIL_SAFE = 30  # starting from 0
 LOOT_CONTAINER_ID = 0x7292F926
 LOOT_CONTAINER_COORDS = (2467, 182)
 HOLD_BANDAGES = 7
-
 WATER_TILE_TYPE_IDS = [0x179A, 0x179B, 0x179C, 0x1797, 0x1799, ]
 
 FISHING_ERRORS = [
@@ -117,7 +115,8 @@ class Fishing(ScriptBase):
         self.max_range = MAX_RANGE
         self._spots = []
         self._current_spot = None
-        self._fishing_i = 0
+        self.i = 0
+        self.fail_safe_i = 0
         self.unload_itemids = FISHING_LOOT
         x, y = LOOT_CONTAINER_COORDS
         self.loot_container = Container.instantiate(LOOT_CONTAINER_ID, x=x, y=y, fixed_coords=True)
@@ -145,7 +144,7 @@ class Fishing(ScriptBase):
     @property
     def fishing_pole(self):
         obj_id = ObjAtLayer(LhandLayer())
-        if obj_id:
+        if obj_id and stealth.GetType(obj_id) == constants.TYPE_ID_TOOL_FISHING_POLE:
             output_id = obj_id
         else:
             output_id = self.player.find_type_backpack(constants.TYPE_ID_TOOL_FISHING_POLE)
@@ -262,12 +261,15 @@ class Fishing(ScriptBase):
         self.parse_commands()
         self._fishing_iteration(tile_type, tile_x, tile_y, tile_z)
         tools.result_delay()
+        tools.result_delay()  # todo: investigate
         output = stealth.HighJournal()
         return output
 
-    def tile_depleeted(self):
+    def tile_reset(self):
         self._processed_mobs = []
         self.wait_stamina(0.2)
+        self.i = 0
+        self.fail_safe_i = 0
 
     def cut_fish(self, search_distance=constants.USE_GROUND_RANGE):
         cutting_tool = self.player.corpse_cutting_tool
@@ -275,9 +277,11 @@ class Fishing(ScriptBase):
             return  # todo:
 
         fish = self.player.find_types_ground(constants.TYPE_IDS_FISH, distance=search_distance)
-        for fish_item in fish:
-            self.player.use_object_on_object(cutting_tool, fish_item)
-            tools.result_delay()
+        if fish:
+            tools.delay(constants.USE_COOLDOWN)
+            for fish_item in fish:
+                self.player.use_object_on_object(cutting_tool, fish_item)
+                tools.delay(constants.USE_COOLDOWN)
 
     def unload_get_weapon(self):
         if USE_RANGED_WEAPON:
@@ -314,18 +318,17 @@ class Fishing(ScriptBase):
                 if not self.checks():
                     self.move_to_spot_loop(spot_x, spot_y)
                     self.equip_fishing_pole()
-                i = 0
-                max_i = 3
+                previous_journal_index = self.fishing_iteration(tile_type, tile_x, tile_y, tile_z)
+                self.tile_reset()
                 while True:
-                    if i == 0 or i > max_i:
-                        if self.player.xy != (spot_x, spot_y):
-                            self.move_to_spot_loop(spot_x, spot_y)
-                            self.equip_fishing_pole()
-                        journal_index = self.fishing_iteration(tile_type, tile_x, tile_y, tile_z)
-                    else:
-                        journal_index = stealth.HighJournal()
-                    i += 1
-                    journal_contents = tools.journal(start_index=journal_index)
+                    if self.player.xy != (spot_x, spot_y):
+                        self.move_to_spot_loop(spot_x, spot_y)
+                        self.equip_fishing_pole()
+
+                    highjournal = stealth.HighJournal()
+                    journal_contents = []
+                    if previous_journal_index != highjournal:
+                        journal_contents = tools.journal(start_index=highjournal)
 
                     skip = [j for j in journal_contents if j.contains(r'skip \d+', regexp=True, return_re_value=True)]
                     if any(skip):
@@ -336,17 +339,18 @@ class Fishing(ScriptBase):
                         log.info(f"Skipping {quantity}")
                         for i in range(quantity):
                             tiles.pop(0)
-                        self.tile_depleeted()
+                        # self.tile_reset()
                         break
 
                     successes = [e for e in FISHING_SUCCESS_MESSAGES if any([j.contains(e) for j in journal_contents])]
                     if successes:
-                        max_i += 1
+                        self.tile_reset()
+                        previous_journal_index = highjournal
 
                     errors = [e for e in FISHING_ERRORS if any([j.contains(e) for j in journal_contents])]
                     if errors:
-                        # log.debug(f"Depletion message detected: {errors[0]}")
-                        self.tile_depleeted()
+                        log.debug(f"Depletion message detected: {errors[0]}")
+                        # self.tile_reset()
                         break
 
                     too_much_fish = [e for e in ERRORS_TOO_MUCH_FISH if any([j.contains(e) for j in journal_contents])]
@@ -355,15 +359,40 @@ class Fishing(ScriptBase):
                         if not self.checks():
                             self.move_to_spot_loop(spot_x, spot_y)
                             self.equip_fishing_pole()
-                            i = 0
+                        self.tile_reset()
+                        previous_journal_index = stealth.HighJournal()
                         continue
 
                     if not self.checks(break_action=False):
                         self.move_to_spot_loop(spot_x, spot_y)
                         self.equip_fishing_pole()
-                        i = 0
-                    log.info(f"{i}/{max_i} Waiting for fishing to complete: {journal_contents[-1].text}")
-                    stealth.Wait(constants.USE_COOLDOWN / 6)
+                        self.tile_reset()
+                        continue
+
+                    self.fail_safe_i += 1
+                    if self.fail_safe_i > MAX_FAIL_SAFE:
+                        log.warning(f"Failsafe: {self.fail_safe_i}. Reconnecting")
+                        self.fail_safe_i = 0
+                        self.i = MAX_ITERATIONS
+                        tools.reconnect()
+
+                    self.i += 1
+                    if self.i > MAX_ITERATIONS:
+                        log.debug(f'{self.i} > {MAX_ITERATIONS}')
+                        self.i = 0
+                        previous_journal_index = self.fishing_iteration(tile_type, tile_x, tile_y, tile_z)
+
+                    fail_safe_str = ''
+                    if self.fail_safe_i > MAX_FAIL_SAFE * 0.75:
+                        fail_safe_str = f' ({self.fail_safe_i}/{MAX_FAIL_SAFE}) '
+
+                    line_contents = ''
+                    if journal_contents:
+                        line_contents = f" : {len(journal_contents)} : {journal_contents[-1].text_clean}"
+
+                    log.info(f"{self.i}/{MAX_ITERATIONS + 1} {self.player.weight:>3}/{self.player.max_weight} "
+                             f"{fail_safe_str}{line_contents}")
+                    stealth.Wait(constants.USE_COOLDOWN / 10)
 
                 # log.debug(f"Exiting tile loop {tile_type} {tile_x} {tile_y} {tile_z}")
             # log.debug(f"Exiting spot for {spot_x} {spot_y}")

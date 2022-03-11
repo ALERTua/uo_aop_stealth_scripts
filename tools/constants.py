@@ -40,13 +40,13 @@ USE_GROUND_RANGE = 3
 MAX_PICK_UP_DISTANCE = 3
 
 # COOLDOWNS
-SKILL_COOLDOWN = 3000 + tools.server_ping_average() + 10
-DRAG_COOLDOWN = 250 + tools.server_ping_average() + 10
+SKILL_COOLDOWN = 3000 + tools.server_ping_average() * 2
+DRAG_COOLDOWN = 250 + tools.server_ping_average() * 2
 LOOT_COOLDOWN = DRAG_COOLDOWN
-USE_COOLDOWN = 3000 + tools.server_ping_average() + 10
+USE_COOLDOWN = 3000 + tools.server_ping_average() * 2 + 100
 MINING_COOLDOWN = USE_COOLDOWN
-BANDAGE_COOLDOWN = 8000 + tools.server_ping_average() + 100  # due to the last healing pulse at the end
-POTION_COOLDOWN = 8000 + tools.server_ping_average() + 10
+BANDAGE_COOLDOWN = 8000 + tools.server_ping_average() * 2 + 100  # due to the last healing pulse at the end
+POTION_COOLDOWN = 8000 + tools.server_ping_average() * 2
 
 # WEIGHTS
 WEIGHT_ORE = 12
