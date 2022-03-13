@@ -19,7 +19,9 @@ class Inscription(ScriptBase):
             scepter = self.player.find_type_backpack(constants.TYPE_ID_SCEPTER)
             if not scepter:
                 self.player.open_container(self.player.backpack, subcontainers=True)
-                scepter = self.player.find_type_backpack(constants.TYPE_ID_SCEPTER)
+                self.player.open_container(self.player.backpack, subcontainers=True)
+                tools.delay(1000)
+                scepter = self.player.find_type_backpack(constants.TYPE_ID_SCEPTER, recursive=True)
                 if not scepter:
                     log.error("No scepters found. Cannot proceed")
                     self.quit()

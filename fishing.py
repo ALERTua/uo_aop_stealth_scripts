@@ -23,7 +23,7 @@ ROAM_COORDS = [
     (2473, 265),
     (2464, 254),
 ]
-MOUNT_ID = 0x076FB1F9
+MOUNT_ID = 0x0770DDB1
 FISHING_MAX_RANGE = 5
 MAX_RANGE = 25
 MOB_FIND_DISTANCE = 40
@@ -41,8 +41,8 @@ RANGED_UNMOUNT = True
 RANGED_KEEP_DISTANCE = 8
 LOOT_CORPSES = True
 CUT_CORPSES = True
-MAX_ITERATIONS = 4  # starting from 0
-MAX_FAIL_SAFE = 30  # starting from 0
+MAX_ITERATIONS = 8  # starting from 0
+MAX_FAIL_SAFE = MAX_ITERATIONS * 5  # starting from 0
 LOOT_CONTAINER_ID = 0x7292F926
 LOOT_CONTAINER_COORDS = (2467, 182)
 HOLD_BANDAGES = 7
@@ -201,7 +201,7 @@ class Fishing(ScriptBase):
             notify_errors=NOTIFY_MOB_ERRORS, loot=LOOT_CORPSES, cut=CUT_CORPSES, mob_find_distance=MOB_FIND_DISTANCE,
             drop_overweight_items=False, ranged=USE_RANGED_WEAPON, check_health_func=self.fish_check_health,
             ranged_weapon=self.ranged_weapon, ranged_unmount=RANGED_UNMOUNT, ranged_keep_distance=RANGED_KEEP_DISTANCE,
-            drop_trash_items=True, trash_items=self.trash_item_ids, notorieties=[], path_distance=False, **kwargs)
+            drop_trash_items=True, trash_items=self.trash_item_ids, path_distance=False, **kwargs)
 
     def check_weapon_loop(self):
         if not USE_RANGED_WEAPON:
@@ -259,6 +259,7 @@ class Fishing(ScriptBase):
             self.unload()
         # self.move_to_spot_loop(tile_x, tile_y, accuracy=FISHING_MAX_RANGE)
         self.parse_commands()
+        self.checks()
         self._fishing_iteration(tile_type, tile_x, tile_y, tile_z)
         tools.result_delay()
         tools.result_delay()  # todo: investigate
@@ -267,9 +268,13 @@ class Fishing(ScriptBase):
 
     def tile_reset(self):
         self._processed_mobs = []
-        self.wait_stamina(0.2)
         self.i = 0
         self.fail_safe_i = 0
+        if self.player.stamina < self.player.max_stamina * 0.2:
+            self.player.break_action()
+            self.checks(break_action=True)
+            self.wait_stamina(0.2)
+            self.i = MAX_ITERATIONS
 
     def cut_fish(self, search_distance=constants.USE_GROUND_RANGE):
         cutting_tool = self.player.corpse_cutting_tool
@@ -296,6 +301,7 @@ class Fishing(ScriptBase):
             self._unload_get_item(constants.TYPE_IDS_WEAPONS, self.loot_container)
 
     def unload_and_return(self):
+        self.mount()
         self.player.break_action()
         self.check_overweight()
         self.move_to_unload(self.loot_container)
@@ -324,6 +330,12 @@ class Fishing(ScriptBase):
                     if self.player.xy != (spot_x, spot_y):
                         self.move_to_spot_loop(spot_x, spot_y)
                         self.equip_fishing_pole()
+
+                    if not self.checks(break_action=False):
+                        self.move_to_spot_loop(spot_x, spot_y)
+                        self.equip_fishing_pole()
+                        self.tile_reset()
+                        continue
 
                     highjournal = stealth.HighJournal()
                     journal_contents = []
@@ -360,13 +372,8 @@ class Fishing(ScriptBase):
                             self.move_to_spot_loop(spot_x, spot_y)
                             self.equip_fishing_pole()
                         self.tile_reset()
+                        self.cut_fish()
                         previous_journal_index = stealth.HighJournal()
-                        continue
-
-                    if not self.checks(break_action=False):
-                        self.move_to_spot_loop(spot_x, spot_y)
-                        self.equip_fishing_pole()
-                        self.tile_reset()
                         continue
 
                     self.fail_safe_i += 1
@@ -392,7 +399,7 @@ class Fishing(ScriptBase):
 
                     log.info(f"{self.i}/{MAX_ITERATIONS + 1} {self.player.weight:>3}/{self.player.max_weight} "
                              f"{fail_safe_str}{line_contents}")
-                    stealth.Wait(constants.USE_COOLDOWN / 10)
+                    tools.result_delay()
 
                 # log.debug(f"Exiting tile loop {tile_type} {tile_x} {tile_y} {tile_z}")
             # log.debug(f"Exiting spot for {spot_x} {spot_y}")

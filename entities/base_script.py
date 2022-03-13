@@ -159,6 +159,13 @@ class ScriptBase:
             for item in found_items:
                 self.player.grab(item)
 
+    def mount(self, mount_id=None):
+        if self.player.unmounted:
+            # noinspection PyProtectedMember
+            mount = Creature.instantiate(mount_id or self.player._mount)
+            self.player.move_to_object(mount)
+            self.player.use_object(mount)
+
     @alive_action
     def engage_mob_loop(self,  mob: Mob, check_health_func, ranged=False, ranged_weapon: WeaponBase = None,
                         ranged_unmount=True, ranged_keep_distance=8):
@@ -169,10 +176,14 @@ class ScriptBase:
             if not isinstance(ranged_weapon, WeaponBase):
                 ranged_weapon = Weapon.instantiate(ranged_weapon)
         i = 0
-        max_i = 400
+        max_i = 200
         while mob.alive and (i := i + 1) < max_i:
             # noinspection PyProtectedMember
             if self.player._mount == mob.id_:
+                break
+
+            if mob.distance > 100:
+                log.info(f"{mob} distance: {mob.distance}. Breaking")
                 break
 
             if ranged:
@@ -199,11 +210,8 @@ class ScriptBase:
             self.player.attack(mob.id_)
             log.info(f"({i}/{max_i}) [{self.player.hp}/{self.player.max_hp}] "
                      f"Fight with [{mob.hp}/{mob.max_hp}]{mob} at range {mob.distance}")
-        if remount and self.player.unmounted:
-            # noinspection PyProtectedMember
-            mount = Creature.instantiate(self.player._mount)
-            self.player.move_to_object(mount)
-            self.player.use_object(mount)
+        if remount:
+            self.mount()
 
         if rearm:
             self.player.disarm()
@@ -467,7 +475,7 @@ class ScriptBase:
             return
 
         container_items = [Item.instantiate(i) for i in container_items]
-        container_items.sort(key=lambda i: typeid.index(i.type_id) and (condition(i) if condition else True))
+        container_items.sort(key=lambda _: typeid.index(stealth.GetType(_.id_)) and (condition(_) if condition else True))
         container_item = container_items[0]
         loot_quantity = quantity
         if got_item and quantity > 1 and got_item[0].quantity < quantity:

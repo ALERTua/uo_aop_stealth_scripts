@@ -613,7 +613,6 @@ class Player(Creature):
         if self.hp < self.max_hp:
             self._bandage_self()
 
-    @bandage_cd
     def _drink_potion(self, potion_type, potion_level=None):
         if potion_level is None:
             for i in range(5, 0, -1):
@@ -625,10 +624,12 @@ class Player(Creature):
         log.info(f"Drinking {potion_type} level {potion_level} with {cmd}")
         self.say(cmd)
 
+    @bandage_cd
     def drink_potion_heal(self, level=None):
         if self.find_type_backpack(constants.TYPE_ID_POTION_HEAL, recursive=False):
             return self._drink_potion(potion_type='heal', potion_level=level)
 
+    @bandage_cd
     def drink_potion_refresh(self, level=None):
         if self.find_type_backpack(constants.TYPE_ID_POTION_REFRESH, recursive=False):
             return self._drink_potion(potion_type='refresh', potion_level=level)
