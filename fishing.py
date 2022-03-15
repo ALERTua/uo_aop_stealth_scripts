@@ -90,6 +90,7 @@ FISHING_TRASH = [
     0x0FC7,
     0x0FC8,
     0x1AE0,
+    0x1AE3,
     0x0FC9,
     0x0FCB,
     0x0EC8,
@@ -97,6 +98,7 @@ FISHING_TRASH = [
     0x0FC5,
     0x1AD8,
     0x0EC9,
+    0x0EA6,
     constants.TYPE_ID_SHIELD_BRONZE,
 ]
 FISHING_LOOT = [
@@ -147,7 +149,7 @@ class Fishing(ScriptBase):
         if obj_id and stealth.GetType(obj_id) == constants.TYPE_ID_TOOL_FISHING_POLE:
             output_id = obj_id
         else:
-            output_id = self.player.find_type_backpack(constants.TYPE_ID_TOOL_FISHING_POLE)
+            output_id = self.player.find_type_backpack(constants.TYPE_ID_TOOL_FISHING_POLE, recursive=False)
         if output_id:
             return FishingPole.instantiate(output_id)
 
@@ -224,12 +226,14 @@ class Fishing(ScriptBase):
         self.overweight_loop()
         if not self.check_health():
             self.unload_and_return()
+        if not self.player.got_bandages or \
+                Item.instantiate(self.player.got_bandages).quantity < self._hold_bandages * 0.5:
+            self.unload_and_return()
         if not self.got_fishing_pole or not self.equip_fishing_pole():
             self.no_fishing_pole_loop()
         if self.process_mobs():
             output = False  # force fish again after a mob is killed
         if break_action:
-            self.cut_fish()
             self.loot_corpses(trash_items=self.trash_item_ids)
         self.check_weapon_loop()
         if break_action:
@@ -283,6 +287,8 @@ class Fishing(ScriptBase):
 
         fish = self.player.find_types_ground(constants.TYPE_IDS_FISH, distance=search_distance)
         if fish:
+            if cutting_tool.parent == self.player.backpack:
+                self.player.move_item(cutting_tool, target_id=self.player.backpack, allow_same_container=True)
             tools.delay(constants.USE_COOLDOWN)
             for fish_item in fish:
                 self.player.use_object_on_object(cutting_tool, fish_item)
@@ -307,6 +313,12 @@ class Fishing(ScriptBase):
         self.move_to_unload(self.loot_container)
         self.unload()
         self.move_to_spot_loop(*self.spot_coords)
+
+    def unload(self, **kwargs):
+        super().unload(self.unload_itemids, self.loot_container)
+        if not self.player.corpse_cutting_tool:
+            self._unload_get_item(constants.TYPE_IDS_CORPSE_CUT_TOOLS, self.loot_container,
+                                  condition=lambda i: Weapon.instantiate(i).magic)
 
     def loop(self):
         roam_coords = ROAM_COORDS or [self.player.xy]
@@ -373,7 +385,7 @@ class Fishing(ScriptBase):
                             self.equip_fishing_pole()
                         self.tile_reset()
                         self.cut_fish()
-                        previous_journal_index = stealth.HighJournal()
+                        previous_journal_index = self.fishing_iteration(tile_type, tile_x, tile_y, tile_z)
                         continue
 
                     self.fail_safe_i += 1
@@ -404,13 +416,8 @@ class Fishing(ScriptBase):
                 # log.debug(f"Exiting tile loop {tile_type} {tile_x} {tile_y} {tile_z}")
             # log.debug(f"Exiting spot for {spot_x} {spot_y}")
             self.checks()
+            self.cut_fish()
             self.unload_and_return()
-
-    def unload(self, **kwargs):
-        super().unload(self.unload_itemids, self.loot_container)
-        if not self.player.corpse_cutting_tool:
-            self._unload_get_item(constants.TYPE_IDS_CORPSE_CUT_TOOLS, self.loot_container,
-                                  condition=lambda i: Weapon.instantiate(i).magic)
 
     def start(self):
         super(type(self), self).start()

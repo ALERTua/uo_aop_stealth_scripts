@@ -187,6 +187,7 @@ class ScriptBase:
                 break
 
             if ranged:
+                self.player.unequip_tools()
                 self.player.keep_away(mob.x, mob.y, ranged_keep_distance, accuracy=0, running=None)
                 if ranged_unmount and self.player.mounted:
                     # noinspection PyProtectedMember
@@ -455,10 +456,11 @@ class ScriptBase:
         if entered:
             log.debug(f"Exiting {tools.get_function_name()}")
 
-    def _unload_get_item(self, typeid, loot_container=None, quantity=1, colors=None, condition: callable = None):
+    def _unload_get_item(self, typeid, loot_container=None, quantity=1, colors=None, recursive=False,
+                         condition: callable = None):
         if not isinstance(typeid, Iterable):
             typeid = [typeid]
-        got_item = self.player.find_types_character(typeid)
+        got_item = self.player.find_types_character(typeid, recursive=recursive)
         got_item = [Item.instantiate(i) for i in got_item]
         if got_item and got_item[0].quantity >= quantity:
             return
@@ -469,7 +471,7 @@ class ScriptBase:
 
         if not container_items:
             todo = stealth.GetFindedList()
-            log.info(f"WARNING! NO SPARE {typeid} FOUND!")
+            log.info(f"WARNING! NO SPARE {typeid} FOUND! {tools.get_prev_function_name()}")
             tools.telegram_message(f"{self.player}: {self.name}: No {typeid} found: {todo}")
             self.quit()
             return
@@ -541,9 +543,8 @@ class ScriptBase:
         if not self.player.got_bandages:
             return False
 
-        need_heal = (self.player.max_hp - self.player.hp) > (self.player.max_hp * 0.4)
-        if need_heal:
-            if self.player.got_bandages:
+        if self.player.need_heal_bandage or self.player.need_heal_potion:
+            if self.player.got_bandages or self.player.got_heal_potion:
                 # self.player.break_action()
                 self.player.bandage_self_if_hurt()
                 return True
@@ -553,13 +554,13 @@ class ScriptBase:
             return True
 
     @alive_action
-    def got_bandages(self, quantity):
-        return self.player.got_item_quantity(constants.TYPE_ID_BANDAGE, quantity)
+    def got_bandages(self, quantity, recursive=False):
+        return self.player.got_item_quantity(constants.TYPE_ID_BANDAGE, quantity, recursive=recursive)
 
     def check_bandages(self, hold_bandages=None, container=None):
         hold_bandages = hold_bandages or self._hold_bandages
         container = container or self.loot_container
-        return self._unload_get_item(constants.TYPE_ID_BANDAGE, container, quantity=hold_bandages)
+        return self._unload_get_item(constants.TYPE_ID_BANDAGE, container, quantity=hold_bandages, recursive=False)
 
     @alive_action
     def _check_bandages(self, quantity, container_id):

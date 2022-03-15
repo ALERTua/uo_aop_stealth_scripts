@@ -368,13 +368,14 @@ class Player(Creature):
         while not (move_result := MoveItem(item.id_, quantity, container.id_, x, y, z)) \
                 and item.parent == item_container:
             i += 1
+            tools.result_delay()
             if i > max_tries:
                 log.debug(f"Failsafe {i}. Reconnecting")
                 i = 0
                 tools.reconnect()
             i_str = '' if i < max_tries * 0.7 else f" {i}/{max_tries}"
             log.info(f".{i_str}")
-            tools.result_delay()
+        tools.result_delay()
         # log.debug(f"done. Moving success: {move_result}")
         return move_result
 
@@ -572,8 +573,8 @@ class Player(Creature):
             self.open_container(self.backpack)
         return FindTypeEx(type_id, color_id, self.backpack.id_, recursive)
 
-    def got_item_type(self, item_type, color_id=None):
-        return self.find_type_backpack(item_type, color_id=color_id)
+    def got_item_type(self, item_type, color_id=None, recursive=True):
+        return self.find_type_backpack(item_type, color_id=color_id, recursive=recursive)
 
     def nearest_object_type(self, object_type, distance=None):
         distance = distance or constants.USE_GROUND_RANGE
@@ -624,9 +625,13 @@ class Player(Creature):
         log.info(f"Drinking {potion_type} level {potion_level} with {cmd}")
         self.say(cmd)
 
+    @property
+    def got_heal_potion(self):
+        return self.find_type_backpack(constants.TYPE_ID_POTION_HEAL, recursive=False)
+
     @bandage_cd
     def drink_potion_heal(self, level=None):
-        if self.find_type_backpack(constants.TYPE_ID_POTION_HEAL, recursive=False):
+        if self.got_heal_potion:
             return self._drink_potion(potion_type='heal', potion_level=level)
 
     @bandage_cd
@@ -636,7 +641,7 @@ class Player(Creature):
 
     @property
     def need_heal_bandage(self):
-        return self.hp < self.max_hp - 60
+        return self.hp < self.max_hp - 50
 
     @property
     def need_heal_potion(self):
@@ -652,7 +657,7 @@ class Player(Creature):
 
     @property
     def got_bandages(self):
-        return self.got_item_type(constants.TYPE_ID_BANDAGE)
+        return self.got_item_type(constants.TYPE_ID_BANDAGE, recursive=False)
 
     @alive_action
     def loot_container(self, container_id, destination_id=None, delay=constants.LOOT_COOLDOWN,
@@ -727,14 +732,14 @@ class Player(Creature):
         obj = Object.instantiate(obj)
         return obj.hide()
 
-    def find_types_character(self, types, colors=None):
+    def find_types_character(self, types, colors=None, recursive=True):
         containers = [RhandLayer(), LhandLayer(), self.backpack.id_, self.id_]
-        output = self.find_types(types=types, container_ids=containers, colors=colors, recursive=True)
+        output = self.find_types(types=types, container_ids=containers, colors=colors, recursive=recursive)
         output = [i for i in output if i.parent != self.bank_container]
         return output
 
-    def got_item_quantity(self, item_type, quantity, color=None):
-        items = self.find_types_character(item_type, colors=color)
+    def got_item_quantity(self, item_type, quantity, color=None, recursive=False):
+        items = self.find_types_character(item_type, colors=color, recursive=recursive)
         if not items:
             return False
 
@@ -784,6 +789,9 @@ class Player(Creature):
         if not cutting_tool:
             log.info(f"Cannot cut corpse {corpse_or_id}. No cutting tool.")
             return
+
+        if cutting_tool.parent == self.backpack:
+            self.move_item(cutting_tool, target_id=self.backpack, allow_same_container=True)
 
         log.info(f"Cutting {corpse_or_id}")
         self.use_object_on_object(cutting_tool, corpse)
@@ -850,6 +858,21 @@ class Player(Creature):
             layer_object_id = ObjAtLayer(layer)
             equipped_weapons.append(layer_object_id)
         return equipped_weapons
+
+    def unequip_weapons(self):
+        layers = (LhandLayer(), RhandLayer())
+        for layer in layers:
+            if ObjAtLayer(layer):
+                UnEquip(layer)
+
+    def unequip_tools(self):
+        layers = (LhandLayer(), RhandLayer())
+        for layer in layers:
+            obj = ObjAtLayer(layer)
+            if obj:
+                obj_type = GetType(obj)
+                if obj_type in constants.TYPE_IDS_TOOL:
+                    UnEquip(layer)
 
     @property
     def weapon_equipped(self):
