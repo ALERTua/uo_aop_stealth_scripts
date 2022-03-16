@@ -222,17 +222,17 @@ class Fishing(ScriptBase):
     def checks(self, break_action=True):
         # log.debug(f"Entering checks")
         output = True
-        self.parse_commands()
         self.overweight_loop()
+        if self.process_mobs():
+            output = False  # force fish again after a mob is killed
         if not self.check_health():
             self.unload_and_return()
         if not self.player.got_bandages or \
                 Item.instantiate(self.player.got_bandages).quantity < self._hold_bandages * 0.5:
             self.unload_and_return()
-        if not self.got_fishing_pole or not self.equip_fishing_pole():
+        if not self.got_fishing_pole:
             self.no_fishing_pole_loop()
-        if self.process_mobs():
-            output = False  # force fish again after a mob is killed
+        self.parse_commands()
         if break_action:
             self.loot_corpses(trash_items=self.trash_item_ids)
         self.check_weapon_loop()
@@ -247,12 +247,15 @@ class Fishing(ScriptBase):
 
     def _fishing_iteration(self, tile_type, tile_x, tile_y, tile_z):
         self.parse_commands()
-        use = self.player.use_object_on_tile(self.fishing_pole, tile_type, tile_x, tile_y, tile_z)
-        tools.result_delay()
+        self.equip_fishing_pole()
+        pole = self.fishing_pole
+        CancelWaitTarget()
+        use = self.player.use_object(pole, announce=False)
+        self.player.disarm()
+        self.rearm_from_container(container_id=self.player.backpack)
+        log.info(f"Using {pole} on tile {tile_type}:({tile_x}, {tile_y}, {tile_z})")
+        WaitTargetTile(tile_type, tile_x, tile_y, tile_z)
         return use
-
-    def rearm_from_container(self, **kwargs):
-        return  # todo:
 
     def fishing_iteration(self, tile_type, tile_x, tile_y, tile_z):
         # distance = self.player.distance_to(tile_x, tile_y)
@@ -265,9 +268,8 @@ class Fishing(ScriptBase):
         self.parse_commands()
         self.checks()
         self._fishing_iteration(tile_type, tile_x, tile_y, tile_z)
-        tools.result_delay()
-        tools.result_delay()  # todo: investigate
         output = stealth.HighJournal()
+        # tools.result_delay()
         return output
 
     def tile_reset(self):
@@ -289,6 +291,9 @@ class Fishing(ScriptBase):
         if fish:
             if cutting_tool.parent == self.player.backpack:
                 self.player.move_item(cutting_tool, target_id=self.player.backpack, allow_same_container=True)
+                tools.result_delay()
+            # else:
+            #     self.player.break_action()
             tools.delay(constants.USE_COOLDOWN)
             for fish_item in fish:
                 self.player.use_object_on_object(cutting_tool, fish_item)
@@ -335,17 +340,15 @@ class Fishing(ScriptBase):
                 # log.debug(f"Entering tile loop {tile_type} {tile_x} {tile_y} {tile_z}")
                 if not self.checks():
                     self.move_to_spot_loop(spot_x, spot_y)
-                    self.equip_fishing_pole()
+
                 previous_journal_index = self.fishing_iteration(tile_type, tile_x, tile_y, tile_z)
                 self.tile_reset()
                 while True:
                     if self.player.xy != (spot_x, spot_y):
                         self.move_to_spot_loop(spot_x, spot_y)
-                        self.equip_fishing_pole()
 
                     if not self.checks(break_action=False):
                         self.move_to_spot_loop(spot_x, spot_y)
-                        self.equip_fishing_pole()
                         self.tile_reset()
                         continue
 
@@ -362,7 +365,8 @@ class Fishing(ScriptBase):
                         quantity = min((quantity, len(tiles)))
                         log.info(f"Skipping {quantity}")
                         for i in range(quantity):
-                            tiles.pop(0)
+                            # tiles.pop(0)
+                            tiles.clear()  # yes, i know.
                         # self.tile_reset()
                         break
 
@@ -373,16 +377,15 @@ class Fishing(ScriptBase):
 
                     errors = [e for e in FISHING_ERRORS if any([j.contains(e) for j in journal_contents])]
                     if errors:
-                        log.debug(f"Depletion message detected: {errors[0]}")
+                        log.info(f"Depletion message detected: {errors[0]}")
                         # self.tile_reset()
                         break
 
                     too_much_fish = [e for e in ERRORS_TOO_MUCH_FISH if any([j.contains(e) for j in journal_contents])]
                     if too_much_fish:
-                        log.debug(f"Too much fish message detected: {too_much_fish[0]}")
+                        log.info(f"Too much fish message detected: {too_much_fish[0]}")
                         if not self.checks():
                             self.move_to_spot_loop(spot_x, spot_y)
-                            self.equip_fishing_pole()
                         self.tile_reset()
                         self.cut_fish()
                         previous_journal_index = self.fishing_iteration(tile_type, tile_x, tile_y, tile_z)

@@ -41,12 +41,13 @@ MAX_PICK_UP_DISTANCE = 3
 
 # COOLDOWNS
 SKILL_COOLDOWN = 3000 + tools.server_ping_average() * 2
-DRAG_COOLDOWN = 250 + tools.server_ping_average() * 2
+RESULT_DELAY = tools.server_ping_average() * 2 + 250
+DRAG_COOLDOWN = RESULT_DELAY
 LOOT_COOLDOWN = DRAG_COOLDOWN
-USE_COOLDOWN = 3000 + tools.server_ping_average() * 2 + 100
+USE_COOLDOWN = 3000 + RESULT_DELAY
 MINING_COOLDOWN = USE_COOLDOWN
-BANDAGE_COOLDOWN = 8000 + tools.server_ping_average() * 3 + 150  # due to the last healing pulse at the end
-POTION_COOLDOWN = 8000 + tools.server_ping_average() * 2
+BANDAGE_COOLDOWN = 8000 + RESULT_DELAY  # due to the last healing pulse at the end
+POTION_COOLDOWN = 8000 + RESULT_DELAY
 
 # WEIGHTS
 WEIGHT_ORE = 12

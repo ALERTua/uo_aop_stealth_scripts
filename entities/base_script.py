@@ -411,6 +411,8 @@ class ScriptBase:
         if self.player.distance_to(*loot_container.xy) > 1 or self.player.path_distance_to(*loot_container.xy) > 1:
             log.info("Moving to unload")
             self.wait_stamina()
+            self.player.disarm()
+            self.rearm_from_container(container_id=self.player.backpack)
             result = self.player.move_to_object(loot_container, accuracy=0, running=self.should_run)
             log.debug(f"Moving to unload result: {result}")
         tools.ping_delay()
@@ -506,6 +508,7 @@ class ScriptBase:
         self.parse_commands()
         if drink_trash_potions:
             self.drink_trash_potions()
+        self.player.disarm()
         self.player.unload_types(item_ids, container)
         self.unload_get_tool()
         self.unload_get_weapon()
@@ -520,7 +523,7 @@ class ScriptBase:
     def heal_from_container(self, container=None):
         container = container or self.loot_container
         if self.player.need_heal_bandage and (bandage := self.player.find_type(constants.TYPE_ID_BANDAGE, container)):
-            bandage_cd(self.player.use_object_on_object)(bandage, self.player)
+            bandage_cd(self.player.use_object_on_object)(obj=bandage, target=self.player)
 
     def check_health(self, resurrect=False):
         if self.player.dead:
@@ -690,8 +693,8 @@ class ScriptBase:
         if shield_type_ids:
             arms.append(shield_type_ids)
 
-        for arm in arms:
-            for type_id in arm:
+        for arm_type in arms:
+            for type_id in arm_type:
                 # if self.player.weapon_equipped:
                 #     break
 
@@ -702,6 +705,7 @@ class ScriptBase:
                 found_weapon = random.choice(found_weapon)
                 self.player.equip_object(found_weapon, stealth.RhandLayer())
                 tools.result_delay()
+                break
 
     @alive_action
     def check_weapon(self, max_weapon_search_distance=20):

@@ -39,7 +39,7 @@ class Inscription(ScriptBase):
             stealth.UseSkill(skill_name)
             if stealth.GetSkillValue(skill_name) >= 80.0:
                 stealth.WaitMenu('Choose a Circle', 'Seventh Circle')
-                stealth.WaitMenu('Choose the Spell', 'Gate travel')
+                stealth.WaitMenu('Choose the Spell', 'Gate Travel')
             elif stealth.GetSkillValue(skill_name) >= 65.0:
                 stealth.WaitMenu('Choose a Circle', 'Sixth Circle')
                 stealth.WaitMenu('Choose the Spell', 'Energy Bolt')

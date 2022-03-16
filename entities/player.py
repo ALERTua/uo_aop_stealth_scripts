@@ -613,6 +613,7 @@ class Player(Creature):
     def bandage_self(self):
         if self.hp < self.max_hp:
             self._bandage_self()
+            tools.result_delay()
 
     def _drink_potion(self, potion_type, potion_level=None):
         if potion_level is None:
@@ -884,6 +885,7 @@ class Player(Creature):
         output = any(e for e in equipped_types if e in weapon_type_ids)
         return output
 
+    @drag_cd
     def equip_object(self, item_or_id, layer):
         if isinstance(item_or_id, Item):
             item_or_id = item_or_id.id_
@@ -895,6 +897,7 @@ class Player(Creature):
     def equip_armor_id(self, armor_or_id):
         return self.equip_object(armor_or_id, ShirtLayer())
 
+    @use_cd
     def use_type(self, type_id):
         if not type_id:
             return

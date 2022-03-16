@@ -13,6 +13,9 @@ from entities.journal_line import JournalLine
 import py_stealth as stealth
 
 from global_logger import Log
+
+from tools import constants
+
 log = Log.get_logger(use_colors=False)
 _server_ip = None
 _server_ping_average = {}
@@ -115,7 +118,7 @@ def ping_delay():
 
 
 def result_delay():
-    return delay(server_ping_average() * 4)
+    return delay(constants.RESULT_DELAY)
 
 
 def string_in_strings(str_, strings):
