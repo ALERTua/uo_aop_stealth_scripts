@@ -26,14 +26,25 @@ class Inscription(ScriptBase):
                     log.error("No scepters found. Cannot proceed")
                     self.quit()
 
-            while self.player.mana < self.player.max_mana * 0.9:
-                log.debug('Meditating')
-                stealth.UseSkill('meditation')
-                if stealth.GetSkillValue('meditation') < 100.0:
-                    self.player.break_action()
-                tools.delay(constants.SKILL_COOLDOWN)
+            mana_threshold = self.player.max_mana * 0.95
+            if stealth.GetSkillValue('meditation') == 100.0:
+                meditation_trigger = 50
+            else:
+                meditation_trigger = mana_threshold
 
-            log.debug('Inscripting')
+            if self.player.mana < meditation_trigger:
+                log.info('Meditating')
+                stealth.UseSkill('meditation')
+                i = 0
+                while self.player.mana < mana_threshold:
+                    if stealth.GetSkillValue('meditation') < 100.0:
+                        if i > 0:
+                            stealth.UseSkill('meditation')
+                        self.player.break_action()
+                    i += 1
+                    tools.delay(constants.SKILL_COOLDOWN)
+
+            log.info('Inscripting')
             stealth.CancelWaitTarget()
             stealth.WaitTargetObject(scepter)
             stealth.UseSkill(skill_name)
