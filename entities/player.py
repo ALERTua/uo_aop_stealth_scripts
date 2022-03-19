@@ -585,6 +585,7 @@ class Player(Creature):
         forge = Item.instantiate(forge)
         if self.distance_to(*forge.xy) > constants.USE_GROUND_RANGE:
             self.move(*forge.xy, accuracy=1)
+            self.move(*forge.xy, accuracy=1)  # recheck
         for ore_type in [constants.TYPE_ID_ORE, ]:
             while ore := Item.instantiate(self.nearest_object_type(ore_type)):  # todo: break possible infinite loop
                 if not ore.exists:
@@ -596,7 +597,7 @@ class Player(Creature):
 
                 log.info(f"Smelting {ore}")
                 self.use_object_on_object(ore, forge)
-                tools.ping_delay()
+                tools.result_delay()
                 ore_quantity_after = copy(ore.quantity)
                 if (ore.exists and ore_quantity_after) and ore_quantity_before == ore_quantity_after:
                     log.info(f"Smelt unsuccessful! {ore_quantity_before} x {ore}")
