@@ -9,7 +9,7 @@ from tools import constants, tools
 from entities.base_script import ScriptBase, condition, stealth, alive_action
 from tools.tools import log
 
-MINE_IRON = True
+MINE_IRON = False
 SMELT = True
 ENGAGE_MOBS = True
 LOOT_CORPSES = True
@@ -23,7 +23,8 @@ MOB_FIND_DISTANCE = 25
 FREE_PICKAXE_CONTAINERS = {
     0x48EA69BC: (2411, 187),
 }
-MINE_MAX_ITERATIONS = 12
+MINE_MAX_ITERATIONS = 6
+MAX_FAIL_SAFE = MINE_MAX_ITERATIONS * 2
 MINE_ENTRANCE_COORDS = (2427, 177)
 MINING_CONTAINER_ID = 0x728BAB4E
 MINING_CONTAINER_COORDS = (2462, 183)
@@ -93,6 +94,10 @@ MINING_ERRORS = [
 if not MINE_IRON:
     MINING_ERRORS.append('Вы выкопали немного руды.')
 
+SUCCESS_MESSAGES = [
+    'Вы выкопали .*',
+]
+
 
 class Miner(ScriptBase):
     def __init__(self):
@@ -101,9 +106,11 @@ class Miner(ScriptBase):
         self._directions = []
         self._mining_spot = None
         self._direction = None
-        self.mining_i = 0
+        self._i = 0
+        self._fail_safe_i = 0
         x, y = MINING_CONTAINER_COORDS
         self.loot_container = Container.instantiate(MINING_CONTAINER_ID, x=x, y=y, z=None, fixed_coords=True)
+        self.unload_itemids = MINING_LOOT
         self.drop_types = [
             (constants.TYPE_ID_ORE, constants.COLOR_ORE_IRON, constants.WEIGHT_ORE),
             (constants.TYPE_ID_INGOT, constants.COLOR_INGOT_IRON, constants.WEIGHT_INGOT),
@@ -116,7 +123,7 @@ class Miner(ScriptBase):
     def loot_corpses(self, **kwargs):
         return super().loot_corpses(drop_trash_items=True, trash_items=ITEM_IDS_MINING_TRASH)
 
-    def move_to_unload(self):
+    def move_to_unload(self, **kwargs):
         self.parse_commands()
         dist_to_container = stealth.Dist(self.player.x, self.player.y, *MINING_CONTAINER_COORDS)
         if dist_to_container > 1:
@@ -126,9 +133,10 @@ class Miner(ScriptBase):
             self.wait_stamina()
             self.player.move(*self.loot_container.xy, accuracy=1)
             tools.ping_delay()
-        if self.loot_container.exists and self.player.last_container != self.loot_container \
-                and not self.player.open_container(self.loot_container):
-            tools.telegram_message(f"Failed to open {self.loot_container}")
+        # if self.loot_container.exists and self.player.last_container != self.loot_container \
+        #         and not self.player.open_container(self.loot_container, subcontainers=True):
+        #     tools.telegram_message(f"Failed to open {self.loot_container}")
+        self.player.open_container(self.loot_container, subcontainers=True)
         log.info("Moving to unload done")
 
     @alive_action
@@ -183,7 +191,8 @@ class Miner(ScriptBase):
         log.info("Unloading")
         self.move_to_unload()
         self.move_to_unload()
-        self.player.unload_types(MINING_LOOT, MINING_CONTAINER_ID)
+        self.record_stats()
+        self.player.unload_types(self.unload_itemids, MINING_CONTAINER_ID)
         self.check_pickaxes()
         self.check_bandages()
         self.rearm_from_container()
@@ -274,7 +283,7 @@ class Miner(ScriptBase):
         if check_overweight:
             self.general_weight_check()
         if self.process_mobs():
-            self.mining_i = MINE_MAX_ITERATIONS  # force dig again after a mob is killed
+            self._i = MINE_MAX_ITERATIONS  # force dig again after a mob is killed
         if loot_corpses:
             self.loot_corpses()
         self.check_weapon()
@@ -306,52 +315,9 @@ class Miner(ScriptBase):
                 self.smelt()
 
         self.move_mining_spot()
-        stealth.ClearJournal()
         self.player.mine(self.direction)
-        self.parse_commands()
-
-    def do_mining(self):
-        self.mine_direction()
-        self.mining_i = 0
-        while True:
-            if tools.in_journal(r'skip \d+ spot[s]', regexp=True):
-                spots_quantity = tools.in_journal(r'skip \d+ spot[s]', regexp=True, return_re_value=True)
-                spots_quantity = int(re.findall(r'\d+', spots_quantity[0])[0])
-                log.info(f"Skipping {spots_quantity} spots")
-                for i in range(spots_quantity):
-                    self.mining_spot_depleeted()
-                self._directions = []
-                self.mining_i = 0
-                self.mine_direction()
-                continue
-            elif tools.in_journal('skip spot'):
-                log.info(f"Skipping spot")
-                self._directions = []
-                self.mining_i = 0
-                self.mine_direction()
-                continue
-            elif any(_ for _ in MINING_ERRORS if tools.in_journal(_)):
-                # self.player._use_cd = pendulum.now()  # todo: tryout
-                self.direction_depleeted()
-                self.mining_i = 0
-                self._checks()
-                if self.general_weight_check():
-                    self.mining_i = MINE_MAX_ITERATIONS  # force mine direction after smelt or unload
-                self.mine_direction()
-                continue
-
-            self._checks(check_overweight=False, loot_corpses=False)
-            # if self.general_weight_check():
-            #     i = MINE_MAX_ITERATIONS  # force mine direction after smelt or unload
-            self.mining_i += 1
-            if self.mining_i > MINE_MAX_ITERATIONS:
-                self.player._use_cd = pendulum.now()
-                self.mine_direction()
-                self.mining_i = 0
-
-            last_journal_message = stealth.LastJournalMessage()
-            log.info(f"{self.mining_i}/{MINE_MAX_ITERATIONS} Waiting for mining to complete: {last_journal_message}")
-            stealth.Wait(constants.USE_COOLDOWN)
+        output = stealth.HighJournal()
+        return output
 
     @property
     def nearest_forge(self):
@@ -381,8 +347,8 @@ class Miner(ScriptBase):
         # noinspection PyProtectedMember
         return self.player.got_item_type(constants.TYPE_ID_ORE)
 
-    def drop_overweight_items(self, **kwargs):
-        return super().drop_overweight_items(self.drop_types)
+    def drop_overweight_items(self, drop_types=None):
+        return super().drop_overweight_items(drop_types=drop_types or self.drop_types)
 
     def check_overweight(self, **kwargs):
         return super().check_overweight(drop_types=self.drop_types)
@@ -422,6 +388,78 @@ class Miner(ScriptBase):
     @condition(EQUIP_WEAPONS_FROM_LOOT_CONTAINER)
     def rearm_from_container(self, **kwargs):
         return super().rearm_from_container(container_id=MINING_CONTAINER_ID)
+
+    def do_mining(self):
+        previous_journal_index = self.mine_direction()
+        self._i = 0
+        self._fail_safe_i = 0
+        while True:
+            highjournal = stealth.HighJournal()
+            journal_contents = []
+            if previous_journal_index != highjournal:
+                journal_contents = tools.journal(start_index=highjournal)
+
+            errors = [e for e in MINING_ERRORS if any([j.contains(e) for j in journal_contents])]
+            if errors:
+                # self.player._use_cd = pendulum.now()  # todo: tryout
+                self.player.break_action()
+                self._checks()
+                self.direction_depleeted()
+                self._i = 0
+                self._fail_safe_i = 0
+                if self.general_weight_check():
+                    self._i = MINE_MAX_ITERATIONS  # force mine direction after smelt or unload
+                else:
+                    tools.result_delay()
+                previous_journal_index = self.mine_direction()
+                continue
+
+            skip = [j for j in journal_contents if j.contains(r'skip \d+', regexp=True, return_re_value=True)]
+            if any(skip):
+                text = skip[0].text
+                numbers = re.findall(r'\d+', text)
+                spots_quantity = int(numbers[0])
+                log.info(f"Skipping {spots_quantity}")
+                for i in range(spots_quantity):
+                    self.mining_spot_depleeted()
+                self._directions = []
+                self._i = 0
+                self._fail_safe_i = 0
+                previous_journal_index = self.mine_direction()
+                continue
+
+            if tools.in_journal('skip spot'):
+                log.info(f"Skipping spot")
+                self._directions = []
+                self._i = 0
+                self._fail_safe_i = 0
+                previous_journal_index = self.mine_direction()
+                continue
+
+            successes = [e for e in SUCCESS_MESSAGES if any([j.contains(e, regexp=True) for j in journal_contents])]
+            if successes:
+                previous_journal_index = highjournal
+                self._i = 0
+                self._fail_safe_i = 0
+
+            self._checks(check_overweight=False, loot_corpses=False)
+            # if self.general_weight_check():
+            #     i = MINE_MAX_ITERATIONS  # force mine direction after smelt or unload
+            self._i += 1
+            self._fail_safe_i += 1
+            if self._fail_safe_i > MAX_FAIL_SAFE:
+                log.warning(f"Failsafe: {self._fail_safe_i}. Reconnecting")
+                self._fail_safe_i = 0
+                self._i = MINE_MAX_ITERATIONS
+                tools.reconnect()
+
+            if self._i > MINE_MAX_ITERATIONS:
+                self.player._use_cd = pendulum.now()
+                previous_journal_index = self.mine_direction()
+                self._i = 0
+
+            log.info(f"{self._i}/{MINE_MAX_ITERATIONS} Waiting for mining to complete: {stealth.LastJournalMessage()}")
+            stealth.Wait(constants.USE_COOLDOWN / 10)
 
     def start(self):
         super(type(self), self).start()
