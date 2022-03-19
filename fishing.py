@@ -164,6 +164,7 @@ class Fishing(ScriptBase):
         if not self.fishing_pole.equipped:
             self.player.disarm()
             self.player.equip_weapon_id(self.fishing_pole)
+            tools.result_delay()
         return True
 
     def _get_tiles(self):
@@ -249,13 +250,16 @@ class Fishing(ScriptBase):
         self.parse_commands()
         self.equip_fishing_pole()
         pole = self.fishing_pole
+        if not pole:
+            return
+
         CancelWaitTarget()
-        use = self.player.use_object(pole, announce=False)
+        self.player.use_object(pole, announce=False)
         self.player.disarm()
+        tools.result_delay()
         self.rearm_from_container(container_id=self.player.backpack)
         log.info(f"Using {pole} on tile {tile_type}:({tile_x}, {tile_y}, {tile_z})")
         WaitTargetTile(tile_type, tile_x, tile_y, tile_z)
-        return use
 
     def fishing_iteration(self, tile_type, tile_x, tile_y, tile_z):
         # distance = self.player.distance_to(tile_x, tile_y)
