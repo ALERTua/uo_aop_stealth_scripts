@@ -224,15 +224,6 @@ class Lumberjack(ScriptBase):
     def eat(self, **kwargs):
         return super().eat(container_id=self.loot_container)
 
-    def record_stats(self):
-        items = self.player.find_types_backpack(type_ids=self.unload_itemids, recursive=True)
-        if not items:
-            return
-
-        for item in items:
-            items_obj = Item.instantiate(item)
-            StatRecorder.record(items_obj)
-
     @alive_action
     def unload(self, **kwargs):
         log.info("Unloading")
