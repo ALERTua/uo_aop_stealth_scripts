@@ -213,6 +213,7 @@ class ScriptBase:
                      f"Fight with [{mob.hp}/{mob.max_hp}]{mob} at range {mob.distance}")
         if remount:
             self.mount()
+            tools.result_delay()
 
         if rearm:
             self.player.disarm()
@@ -419,7 +420,13 @@ class ScriptBase:
         self.player.open_container(loot_container, subcontainers=True)
 
     def record_stats(self):
-        pass
+        items = self.player.find_types_backpack(type_ids=self.unload_itemids, recursive=True)
+        if not items:
+            return
+
+        for item in items:
+            items_obj = Item.instantiate(item)
+            StatRecorder.record(items_obj)
 
     def checks(self, break_action=True):
         pass
