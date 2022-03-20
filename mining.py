@@ -73,7 +73,19 @@ MINING_SPOTS = [
     (2412, 176),
     (2415, 176),
     (2418, 176),
-
+    (2421, 176),
+    (2422, 179),
+    (2425, 179),
+    (2422, 176),
+    (2425, 176),
+    (2415, 173),
+    (2418, 173),
+    (2421, 173),
+    (2424, 173),
+    (2424, 170),
+    (2421, 170),
+    (2418, 170),
+    (2416, 168),
 ]
 DIRECTIONS = [
     'CENTER',
@@ -90,6 +102,7 @@ MINING_ERRORS = [
     'Здесь нет больше руды..',
     'Вы не можете копать в этом месте.',
     'Вы находитесь слишком далеко!',
+    'Подождите, предыдущее действие не завершено.',
 ]
 if not MINE_IRON:
     MINING_ERRORS.append('Вы выкопали немного руды.')
@@ -131,6 +144,7 @@ class Miner(ScriptBase):
             if self.in_mine:
                 self.go_to_mine_entrance()
             self.wait_stamina()
+            self.player.move(*self.loot_container.xy, accuracy=1)
             self.player.move(*self.loot_container.xy, accuracy=1)
             tools.ping_delay()
         # if self.loot_container.exists and self.player.last_container != self.loot_container \
@@ -189,7 +203,6 @@ class Miner(ScriptBase):
     @alive_action
     def unload(self):
         log.info("Unloading")
-        self.move_to_unload()
         self.move_to_unload()
         self.record_stats()
         self.player.unload_types(self.unload_itemids, MINING_CONTAINER_ID)
@@ -401,8 +414,9 @@ class Miner(ScriptBase):
 
             errors = [e for e in MINING_ERRORS if any([j.contains(e) for j in journal_contents])]
             if errors:
-                # self.player._use_cd = pendulum.now()  # todo: tryout
+                log.debug(f"Depletion message detected: {errors[0]}")
                 self.player.break_action()
+                self.player._use_cd = pendulum.now()  # todo: tryout
                 self._checks()
                 self.direction_depleeted()
                 self._i = 0
@@ -425,6 +439,8 @@ class Miner(ScriptBase):
                 self._directions = []
                 self._i = 0
                 self._fail_safe_i = 0
+                self.player.break_action()
+                self.player._use_cd = pendulum.now()  # todo: tryout
                 previous_journal_index = self.mine_direction()
                 continue
 
@@ -433,6 +449,8 @@ class Miner(ScriptBase):
                 self._directions = []
                 self._i = 0
                 self._fail_safe_i = 0
+                self.player.break_action()
+                self.player._use_cd = pendulum.now()  # todo: tryout
                 previous_journal_index = self.mine_direction()
                 continue
 
@@ -454,18 +472,29 @@ class Miner(ScriptBase):
                 tools.reconnect()
 
             if self._i > MINE_MAX_ITERATIONS:
+                self.player.break_action()
                 self.player._use_cd = pendulum.now()
                 previous_journal_index = self.mine_direction()
                 self._i = 0
 
-            log.info(f"{self._i}/{MINE_MAX_ITERATIONS} Waiting for mining to complete: {stealth.LastJournalMessage()}")
+            line_contents = ''
+            if journal_contents:
+                line_contents = f" : {len(journal_contents)} : {journal_contents[-1].text_clean}"
+            fail_safe_str = ''
+            if self._fail_safe_i > MAX_FAIL_SAFE * 0.75:
+                fail_safe_str = f' ({self._fail_safe_i}/{MAX_FAIL_SAFE}) '
+
+            log.info(f"{self._i}/{MINE_MAX_ITERATIONS} {fail_safe_str}{line_contents}")
             stealth.Wait(constants.USE_COOLDOWN / 10)
 
     def start(self):
+        # for spot in MINING_SPOTS:
+        #     self.player.move(*spot, accuracy=0)
+        #     gold = self.player.find_types_backpack([constants.TYPE_ID_GOLD])
+        #     self.player.drop_item(gold[0], 1)
         super(type(self), self).start()
         dist_to_container = self.player.path_distance_to(*MINING_CONTAINER_COORDS)
         if dist_to_container < 20:
-            self.move_to_unload()
             self.unload()
 
         self.general_weight_check()

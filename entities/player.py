@@ -260,9 +260,9 @@ class Player(Creature):
         return False
 
     @container_cd
-    def open_container(self, container, max_tries=15, subcontainers=False):  # todo: with subcontainers
+    def open_container(self, container, max_tries=15, subcontainers=False, force=False):  # todo: with subcontainers
         container = Container.instantiate(container, force_class=True)
-        if not subcontainers and self.last_container == container and not container.is_empty:
+        if not force and not subcontainers and self.last_container == container and not container.is_empty:
             return
 
         # if not container.exists:
@@ -288,14 +288,12 @@ class Player(Creature):
 
         if subcontainers:
             log.info(f"Opening subcontainers for {container}")
-            # subcontainers = self.find_types_container(constants.TYPE_IDS_CONTAINER, container_ids=container,
-            #                                           recursive=True)
             _ = stealth.FindType(-1, container.id_)
             all_items = [Item.instantiate(i) for i in stealth.GetFoundList() if i]
             subcontainers = [i for i in all_items if i and i.is_container]
             for container in subcontainers:
                 if container.is_empty:
-                    self.open_container(container)
+                    self.open_container(container, max_tries=max_tries, subcontainers=subcontainers, force=force)
 
         return True
 
@@ -598,6 +596,7 @@ class Player(Creature):
                 log.info(f"Smelting {ore}")
                 self.use_object_on_object(ore, forge)
                 tools.result_delay()
+                tools.result_delay()  # todo: investigate
                 ore_quantity_after = copy(ore.quantity)
                 if (ore.exists and ore_quantity_after) and ore_quantity_before == ore_quantity_after:
                     log.info(f"Smelt unsuccessful! {ore_quantity_before} x {ore}")

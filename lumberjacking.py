@@ -253,7 +253,7 @@ class Lumberjack(ScriptBase):
 
         self.parse_commands()
         self.player.use_object_on_tile(self.hatchet, tile_type, x, y, z)
-        tools.result_delay()
+        # tools.result_delay()
 
     @property
     def got_logs(self):
@@ -367,18 +367,18 @@ class Lumberjack(ScriptBase):
                 previous_journal_index = highjournal
                 self.lj_i = 0
                 self.fail_safe_i = 0
-
-            errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
-            if errors:
-                # log.debug(f"{len(self._trees)}/{len(LJ_SPOTS)} Depletion message detected: {errors[0]}")
-                self.tree_depleeted()
-                self._checks()
-                if self.general_weight_check():
-                    self.lj_i = MAX_LJ_ITERATIONS
-                previous_journal_index = self.jack_tree()
-                self.lj_i = 0
-                self.fail_safe_i = 0
-                continue
+            else:
+                errors = [e for e in LJ_ERRORS if any([j.contains(e) for j in journal_contents])]
+                if errors:
+                    log.debug(f"{len(self._trees)}/{len(LJ_SPOTS)} Depletion message detected: {errors[0]}")
+                    self.tree_depleeted()
+                    self._checks()
+                    if self.general_weight_check():
+                        self.lj_i = MAX_LJ_ITERATIONS
+                    previous_journal_index = self.jack_tree()
+                    self.lj_i = 0
+                    self.fail_safe_i = 0
+                    continue
 
             self._checks(loot_corpses=False)
             self.fail_safe_i += 1

@@ -322,8 +322,8 @@ class ScriptBase:
                 log.info(f"Need to relieve of {weight_drop_needed}st. Dropping {drop_quantity}×{drop_item}")
                 drop_result = self.player.drop_item(drop_item, drop_quantity)
                 if drop_result:
-                    log.info(f"Drop successful")
-                    tools.result_delay()
+                    log.debug(f"Drop successful")
+                    # tools.result_delay()
                     break
 
     def quit(self, alarm=True):
