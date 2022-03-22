@@ -50,14 +50,17 @@ def _cooldown(class_instance, cooldown_field, cooldown, func, *args, **kwargs):
         left = cooldown_value - pendulum.now()
         time_left = cooldown - left.microseconds / 1000
         if time_left > 0:
+            log.debug(f'Waiting {time_left} for {class_instance.__class__.__name__}.{func.__name__}')
             Wait(time_left)
 
     set_cooldown = kwargs.pop('set_cooldown', True)
     output = func(class_instance, *args, **kwargs)
 
     if set_cooldown:
-        new_now = pendulum.now() + pendulum.Duration(milliseconds=cooldown)
+        duration = pendulum.Duration(milliseconds=cooldown)
+        new_now = pendulum.now() + duration
         setattr(class_instance, cooldown_field, new_now)
+        # log.debug(f"Setting {cooldown_field} to {pendulum.now()} + {duration} = {new_now}")
     return output
 
 

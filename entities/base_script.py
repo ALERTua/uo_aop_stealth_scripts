@@ -326,11 +326,12 @@ class ScriptBase:
                     # tools.result_delay()
                     break
 
-    def quit(self, alarm=True):
+    def quit(self, message=None, alarm=True):
         if alarm:
             stealth.Alarm()
         log.info("Quitting")
-        tools.telegram_message(f"{self.player} quitting")
+        message = message or f"{self.player} quitting"
+        tools.telegram_message(message)
         self.at_exit()
         self.disconnect()
         exit()

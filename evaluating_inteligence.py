@@ -13,8 +13,9 @@ class EvaluatingInteligence(ScriptBase):
         super(type(self), self).start()
         skill_name = 'Evaluate Intelligence'
         while True:
-            if stealth.GetSkillValue(skill_name) == 100.0:
-                self.disconnect()
+            skill_value = stealth.GetSkillValue(skill_name)
+            if skill_value == 100.0:
+                self.quit(f'{self.player.name} {skill_name} reached {skill_value}')
 
             stealth.CancelWaitTarget()
             stealth.UseSkill(skill_name)
