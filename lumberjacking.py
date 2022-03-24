@@ -1,14 +1,9 @@
 import re
 from copy import copy
-from typing import Iterable
-
-import pendulum
 
 from entities.base_script import ScriptBase, alive_action, condition, stealth
 from entities.container import Container
-from entities.item import Item
 from entities.mob import Mob
-from entities.statistics import StatRecorder
 from entities.weapon import Hatchet
 from tools import constants, tools
 from tools.tools import log
@@ -32,7 +27,7 @@ LJ_DISTANCE_TO_TREE = 1
 LJ_CONTAINER_ID = 0x728F3B3B
 LOOT_CONTAINER_OPEN_SUBCONTAINERS = True
 LJ_CONTAINER_COORDS = (2470, 182)
-WOOD_ENTRANCE = (2503, 167)
+WOOD_ENTRANCE = (2499, 162)
 WOOD_ZONE_Y = 188
 MOUNT_ID = 0x076C4894
 LJ_TRASH = [
