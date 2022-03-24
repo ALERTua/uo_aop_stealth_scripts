@@ -64,7 +64,7 @@ class ScriptBase:
             signal.signal(signal_, self.at_exit)
 
     def at_exit(self):
-        log.info(f"{self} atexit.")
+        log.debug(f"{self} atexit.")
         self.print_script_stats()
 
     def start(self):
@@ -72,13 +72,13 @@ class ScriptBase:
         self._start_time = pendulum.now()
 
     def print_script_stats(self):
-        log.info(f"{self} stats:")
-        msg = self.script_stats_str
-        for line in msg.split('\n'):
-            if not line:
-                continue
+        if self.script_stats_str:
+            log.info(f"{self} stats:")
+            for line in self.script_stats_str.split('\n'):
+                if not line:
+                    continue
 
-            log.info(f"  {line}")
+                log.info(f"  {line}")
 
     def __str__(self):
         return self.name

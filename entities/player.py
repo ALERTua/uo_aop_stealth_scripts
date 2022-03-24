@@ -176,6 +176,7 @@ class Player(Creature):
 
     @skill_cd
     def hide(self):
+        log.info('Hiding')
         UseSkill('hiding')
 
     def hide_until_hidden(self):
