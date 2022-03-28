@@ -23,8 +23,10 @@ class Hiding_Stealth(ScriptBase):
         stealth_skill_name = 'stealth'
         while (stealth_value := stealth.GetSkillValue(stealth_skill_name)) < 100:
             while not self.player.hidden:
-                self.player.hide()
+                log.debug('Hiding')
+                stealth.UseSkill('hiding')
                 self.lo_lt()
+                tools.delay(constants.SKILL_COOLDOWN)
 
             if stealth.GetSkillValue('hiding') >= 90:
                 log.debug(f'Stealthing with level {stealth_value}')
