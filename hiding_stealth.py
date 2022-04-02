@@ -1,6 +1,6 @@
 from entities.base_script import ScriptBase, log, stealth, tools, constants
 
-LASTOBJECT_LASTTARGET = True
+LASTOBJECT_LASTTARGET = False
 LASTOBJECT = 0x728EF888
 LASTTARGET = 0x7356EF50
 
@@ -21,23 +21,31 @@ class Hiding_Stealth(ScriptBase):
     def start(self):
         super(type(self), self).start()
         stealth_skill_name = 'stealth'
-        while (stealth_value := stealth.GetSkillValue(stealth_skill_name)) < 100:
-            while not self.player.hidden:
-                log.debug('Hiding')
-                stealth.UseSkill('hiding')
-                self.lo_lt()
-                tools.delay(constants.SKILL_COOLDOWN)
+        hiding_skill_name = 'hiding'
 
-            if stealth.GetSkillValue('hiding') >= 90:
+        def hide():
+            log.debug(hiding_skill_name)
+            stealth.UseSkill(hiding_skill_name)
+            self.lo_lt()
+            tools.delay(constants.SKILL_COOLDOWN)
+
+        while True:
+            stealth_value = stealth.GetSkillValue(stealth_skill_name)
+            hiding_value = stealth.GetSkillValue(hiding_skill_name)
+            if stealth_value == 100 and hiding_value == 100:
+                self.quit(f'{self.player.name} {hiding_skill_name} reached {hiding_value} & '
+                          f'{stealth_skill_name} reached {stealth_value}')
+
+            while not self.player.hidden:
+                hide()
+
+            if hiding_value >= 90 and stealth_value < 100:
                 log.debug(f'Stealthing with level {stealth_value}')
                 stealth.UseSkill(stealth_skill_name)
                 self.lo_lt()
                 tools.delay(constants.SKILL_COOLDOWN)
             else:
-                self.player.hide()
-                self.lo_lt()
-
-        self.quit(f'{self.player.name} {stealth_skill_name} reached {stealth_value}')
+                hide()
 
 
 if __name__ == '__main__':
