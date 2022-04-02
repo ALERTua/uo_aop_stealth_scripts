@@ -1,6 +1,6 @@
 from entities.base_script import ScriptBase, log, stealth, tools, constants
 
-LASTOBJECT_LASTTARGET = True
+LASTOBJECT_LASTTARGET = False
 LASTOBJECT = 0x728EF888
 LASTTARGET = 0x7356EF50
 
