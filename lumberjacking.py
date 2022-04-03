@@ -8,7 +8,7 @@ from entities.weapon import Hatchet
 from tools import constants, tools
 from tools.tools import log
 
-LJ_SLOGS = True  # simple logs
+LJ_SLOGS = False  # simple logs
 ENGAGE_MOBS = True
 ENGAGE_CRITTERS = True
 MOB_FIND_DISTANCE = 25
@@ -236,6 +236,7 @@ class Lumberjack(ScriptBase):
 
     def tree_depleeted(self):
         log.info(f"{len(self._trees)}/{len(LJ_SPOTS)} Tree depleeted: {self.current_tree}.")
+        self.player.break_action()
         self.current_tree = None
         self._processed_mobs = []
 
@@ -334,6 +335,22 @@ class Lumberjack(ScriptBase):
         if check_overweight:
             self.general_weight_check()
 
+    @condition(LOOT_CORPSES)
+    def loot_corpses(self, **kwargs):
+        return super().loot_corpses(cut_corpses=CUT_CORPSES, trash_items=LJ_TRASH,
+                                    corpse_find_distance=CORPSE_FIND_DISTANCE)
+
+    def drop_trash(self, **kwargs):
+        return super(Lumberjack, self).drop_trash(trash_items=self.trash_item_ids)
+
+    @condition(EQUIP_WEAPONS_FROM_GROUND)
+    def check_weapon(self, **kwargs):
+        return super().check_weapon(max_weapon_search_distance=MAX_WEAPON_SEARCH_DISTANCE)
+
+    @condition(EQUIP_WEAPONS_FROM_LOOT_CONTAINER)
+    def rearm_from_container(self, **kwargs):
+        return super().rearm_from_container(container_id=self.loot_container)
+
     def lumberjack_process(self):
         previous_journal_index = self.jack_tree()
         self.fail_safe_i = 0
@@ -396,22 +413,6 @@ class Lumberjack(ScriptBase):
             log.info(f"{len(self._trees)}/{len(LJ_SPOTS)} {self.player.weight:>3}/{self.player.max_weight} "
                      f"{self.lj_i}/{MAX_LJ_ITERATIONS + 1}{fail_safe_str}{line_contents}")
             stealth.Wait(constants.USE_COOLDOWN / 6)
-
-    @condition(LOOT_CORPSES)
-    def loot_corpses(self, **kwargs):
-        return super().loot_corpses(cut_corpses=CUT_CORPSES, trash_items=LJ_TRASH,
-                                    corpse_find_distance=CORPSE_FIND_DISTANCE)
-
-    def drop_trash(self, **kwargs):
-        return super(Lumberjack, self).drop_trash(trash_items=self.trash_item_ids)
-
-    @condition(EQUIP_WEAPONS_FROM_GROUND)
-    def check_weapon(self, **kwargs):
-        return super().check_weapon(max_weapon_search_distance=MAX_WEAPON_SEARCH_DISTANCE)
-
-    @condition(EQUIP_WEAPONS_FROM_LOOT_CONTAINER)
-    def rearm_from_container(self, **kwargs):
-        return super().rearm_from_container(container_id=self.loot_container)
 
     def start(self):
         super(type(self), self).start()
