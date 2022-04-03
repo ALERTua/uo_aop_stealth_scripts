@@ -39,7 +39,8 @@ class Hiding_Stealth(ScriptBase):
             while not self.player.hidden:
                 hide()
 
-            if hiding_value >= 90 and stealth_value < 100:
+            # if hiding_value >= 90 and stealth_value < 100:
+            if hiding_value >= 90:
                 log.debug(f'Stealthing with level {stealth_value}')
                 stealth.UseSkill(stealth_skill_name)
                 self.lo_lt()
