@@ -50,7 +50,7 @@ def _cooldown(class_instance, cooldown_field, cooldown, func, *args, **kwargs):
         left = cooldown_value - pendulum.now()
         time_left = cooldown - left.microseconds / 1000
         if time_left > 0:
-            log.debug(f'Waiting {time_left} for {class_instance.__class__.__name__}.{func.__name__}')
+            log.debug(f'Waiting {int(time_left)} for {class_instance.__class__.__name__}.{func.__name__}')
             Wait(time_left)
 
     set_cooldown = kwargs.pop('set_cooldown', True)
@@ -281,7 +281,6 @@ class Player(Creature):
         if not result:
             i = 0
             while not (result := self._open_container(container)) and (i := i + 1) < max_tries:
-                # noinspection PyProtectedMember
                 tools.delay(constants.USE_COOLDOWN)
 
             if i >= max_tries:
@@ -294,10 +293,9 @@ class Player(Creature):
             log.info(f"Opening subcontainers for {container}")
             _ = stealth.FindType(-1, container.id_)
             all_items = [Item.instantiate(i) for i in stealth.GetFoundList() if i]
-            subcontainers = [i for i in all_items if i and i.is_container]
-            for container in subcontainers:
-                if container.is_empty:
-                    self.open_container(container, max_tries=max_tries, subcontainers=subcontainers, force=force)
+            subcontainers_ = [i for i in all_items if i and i.is_container]
+            for subcontainer in subcontainers_:
+                self._open_container(subcontainer)
 
         return True
 
@@ -317,14 +315,14 @@ class Player(Creature):
 
     def move_to_object(self, obj, optimized=True, accuracy=1, running=True):
         obj = Object.instantiate(obj)
-        result = self.move(*obj.xy, optimized=optimized, accuracy=accuracy, running=running)
+        result = self.move(*obj.xyz, optimized=optimized, accuracy=accuracy, running=running)
         if not result:
-            self.move(*obj.xy, optimized=optimized, accuracy=accuracy + 1, running=running)
-            result = self.move(*obj.xy, optimized=optimized, accuracy=accuracy, running=running)
+            self.move(*obj.xyz, optimized=optimized, accuracy=accuracy + 1, running=running)
+            result = self.move(*obj.xyz, optimized=optimized, accuracy=accuracy, running=running)
 
         return result
 
-    def move(self, x, y, optimized=True, accuracy=1, running=True, overweight_check=True):
+    def move(self, x, y, z=0, optimized=True, accuracy=1, running=True, overweight_check=True):
         if overweight_check and self.overweight:
             log.info(f"{self} Cannot move: overweight")
             return
@@ -332,12 +330,21 @@ class Player(Creature):
         if x <= 0 or y <= 0:
             return
 
+        if z is None:
+            z = 0
+
         # while self.paralyzed:  # todo: doesn't work @ AoP
         #     log.info(f"Waiting until unParalyzed")
         #     tools.result_delay()
 
-        # Xdst, Ydst, Optimized, Accuracy, Running
-        result = newMoveXY(x, y, optimized, accuracy, running) or newMoveXY(x, y, optimized, accuracy, running)
+        if self.z == z:
+            result = newMoveXY(x, y, optimized, accuracy, running) or MoveXYZ(x, y, z, accuracy, accuracy, running)
+        else:
+            result = MoveXYZ(x, y, z, accuracy, accuracy, running) or newMoveXY(x, y, optimized, accuracy, running)
+
+        # result = newMoveXY(x, y, optimized, accuracy, running) \
+        #          or newMoveXY(x, y, optimized, accuracy, running) \
+        #          or MoveXYZ(x, y, z, accuracy, accuracy, running)
         return result
 
     @alive_action
@@ -586,8 +593,8 @@ class Player(Creature):
     def smelt_ore(self, forge):
         forge = Item.instantiate(forge)
         if self.distance_to(*forge.xy) > constants.USE_GROUND_RANGE:
-            self.move(*forge.xy, accuracy=1)
-            self.move(*forge.xy, accuracy=1)  # recheck
+            self.move_to_object(forge, accuracy=1)
+            self.move_to_object(forge, accuracy=1)  # recheck
         for ore_type in [constants.TYPE_ID_ORE, ]:
             while ore := Item.instantiate(self.nearest_object_type(ore_type)):  # todo: break possible infinite loop
                 if not ore.exists:

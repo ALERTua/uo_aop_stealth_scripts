@@ -205,7 +205,7 @@ class ScriptBase:
 
             else:
                 while 50 > mob.distance > 1:
-                    self.player.move(mob.x, mob.y, accuracy=1, running=self.player.should_run)
+                    self.player.move_to_object(mob, accuracy=1, running=self.player.should_run)
             check_health_func()  # script_check_health in scripts
             tools.result_delay()
             self.player.attack(mob.id_)
@@ -749,7 +749,8 @@ class ScriptBase:
 
                 self.wait_stamina()
                 self.check_overweight()
-                self.player.move(*found_weapon.xy, accuracy=constants.MAX_PICK_UP_DISTANCE, running=self.should_run)
+                self.player.move_to_object(found_weapon, accuracy=constants.MAX_PICK_UP_DISTANCE,
+                                           running=self.should_run)
                 self.player.equip_weapon_id(found_weapon)
                 tools.result_delay()
                 weapon_types.remove(weapon_type)

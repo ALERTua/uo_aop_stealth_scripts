@@ -8,7 +8,7 @@ from entities.weapon import Hatchet
 from tools import constants, tools
 from tools.tools import log
 
-LJ_SLOGS = False  # simple logs
+LJ_SLOGS = True  # simple logs
 ENGAGE_MOBS = True
 ENGAGE_CRITTERS = True
 MOB_FIND_DISTANCE = 25
@@ -105,6 +105,8 @@ LJ_SPOTS = [
     (0x0CD6, 2536, 225, 0),
     (0x0CD3, 2543, 216, 0),
     (0x0CE6, 2544, 224, 0),
+    (0x0CDA, 2525, 182, 0),
+    (0x0CD8, 2522, 178, 0),
 ]
 LJ_SLOGS_SUCCESS = [
     'Вы положили несколько бревен в сумку.',
@@ -128,7 +130,7 @@ class Lumberjack(ScriptBase):
     def __init__(self):
         super().__init__()
         x, y = LJ_CONTAINER_COORDS
-        self.loot_container = Container.instantiate(LJ_CONTAINER_ID, x=x, y=y, z=None, fixed_coords=True)
+        self.loot_container = Container.instantiate(LJ_CONTAINER_ID, x=x, y=y, fixed_coords=True)
         self._trees = []
         self._current_tree = None
         self.lj_i = 0
@@ -201,8 +203,8 @@ class Lumberjack(ScriptBase):
             self.player.move_to_object(self.loot_container, accuracy=1)
             log.info("Moving to unload done")
         tools.ping_delay()
-        # if self.loot_container.is_empty:
-        self.player.open_container(self.loot_container, subcontainers=LOOT_CONTAINER_OPEN_SUBCONTAINERS)
+        if self.loot_container.is_empty:
+            self.player.open_container(self.loot_container, subcontainers=LOOT_CONTAINER_OPEN_SUBCONTAINERS)
 
     @alive_action
     def check_hatchet(self):
@@ -214,17 +216,23 @@ class Lumberjack(ScriptBase):
 
         log.info("Moving to grab a Hatchet")
         self.move_to_unload()
-        container_hatchet = self.player.find_types_container(
-            constants.TYPE_ID_HATCHET, container_ids=self.loot_container, recursive=True)
-        if not container_hatchet:
-            self.player.open_container(self.loot_container)
-            if not container_hatchet:
-                todo = stealth.GetFindedList()
-                log.info("WARNING! NO SPARE HATCHETS FOUND!")
-                tools.telegram_message(f"{self.player}: No hatchets found: {todo}")
-                self.quit()
-                return
+        success = False
+        for i in range(3):
+            self.player.open_container(self.loot_container, subcontainers=True)
+            tools.result_delay()
+            container_hatchet = self.player.find_types_container(constants.TYPE_ID_HATCHET,
+                                                                 container_ids=self.loot_container, recursive=True)
+            if container_hatchet:
+                success = True
+                break
 
+        if not success:
+            log.info("WARNING! NO SPARE HATCHETS FOUND!")
+            tools.telegram_message(f"{self.player}: No hatchets found")
+            self.quit()
+            return
+
+        # noinspection PyUnboundLocalVariable
         while not self.got_hatchet and not self.player.move_item(container_hatchet):
             log.info("Grabbing a Hatchet")
             tools.ping_delay()
@@ -439,7 +447,7 @@ class Lumberjack(ScriptBase):
         self.check_health()
         self.general_weight_check()
         dist_to_container = self.player.path_distance_to(*self.loot_container.xy)
-        if dist_to_container < 20:
+        if dist_to_container < 20 or self.player.near_max_weight:
             self.unload()
         if not self.in_woods:
             self.go_woods()
