@@ -338,13 +338,15 @@ class Player(Creature):
         #     tools.result_delay()
 
         if self.z == z:
-            result = newMoveXY(x, y, optimized, accuracy, running) or MoveXYZ(x, y, z, accuracy, accuracy, running)
+            result = newMoveXY(x, y, optimized, accuracy, running) \
+                     or newMoveXY(x, y, optimized, accuracy, running) \
+                     or MoveXYZ(x, y, z, accuracy, accuracy, running) \
+                     or MoveXYZ(x, y, z, accuracy, accuracy, running)
         else:
-            result = MoveXYZ(x, y, z, accuracy, accuracy, running) or newMoveXY(x, y, optimized, accuracy, running)
-
-        # result = newMoveXY(x, y, optimized, accuracy, running) \
-        #          or newMoveXY(x, y, optimized, accuracy, running) \
-        #          or MoveXYZ(x, y, z, accuracy, accuracy, running)
+            result = MoveXYZ(x, y, z, accuracy, accuracy, running) \
+                     or MoveXYZ(x, y, z, accuracy, accuracy, running) \
+                     or newMoveXY(x, y, optimized, accuracy, running) \
+                     or newMoveXY(x, y, optimized, accuracy, running)
         return result
 
     @alive_action
