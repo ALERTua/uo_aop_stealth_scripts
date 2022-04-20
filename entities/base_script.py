@@ -381,12 +381,16 @@ class ScriptBase:
                         tools.telegram_message(f"Couldn't resurrect. No reagent {reg_type} found @ bank")
                         self.disconnect()
                         quit()
+
                     grab_result = self.player.grab(bank_item, quantity=1)
                     if not grab_result:
                         log.info(f"Couldn't grab {reg_type}:{bank_item} from bank")
                         tools.telegram_message(f"Couldn't resurrect. Couldn't grab {reg_type}:{bank_item} from bank")
                         self.disconnect()
                         quit()
+
+                if len(regs := self.player.find_types_backpack(reagent_types)) < 3:
+                    continue
 
                 if self.player.need_heal_bandage and (bank_bandage := self.player.find_type(
                         constants.TYPE_ID_BANDAGE, self.player.bank_container)):
