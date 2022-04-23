@@ -119,7 +119,49 @@ class Player(Creature):
         self._drag_cooldown = None
         self._use_cooldown = None
         self._mount = None
+        self.__coords_cache = (0, 0, 0)
+        self._last_move = pendulum.now()
         SetFindDistance(99)
+
+    @property
+    def _coords_cache(self):
+        return self.__coords_cache
+
+    @_coords_cache.setter
+    def _coords_cache(self, value):
+        if self.__coords_cache == value:
+            return
+
+        self.__coords_cache = value
+        self._last_move = pendulum.now()
+        # log.debug(f"Player moved to {value} @ {self._last_move}")
+
+    @property
+    def x(self):
+        x = stealth.GetX(self._id)
+        _, y, z = self._coords_cache
+        self._coords_cache = (x, y, z)
+        return x
+
+    @property
+    def y(self):
+        y = stealth.GetY(self._id)
+        x, _, z = self._coords_cache
+        self._coords_cache = (x, y, z)
+        return y
+
+    @property
+    def z(self):
+        z = stealth.GetZ(self._id)
+        x, y, _ = self._coords_cache
+        self._coords_cache = (x, y, z)
+        return z
+
+    def is_stuck(self, stuck_timeout_seconds):
+        if self._last_move < pendulum.now() - pendulum.Duration(seconds=stuck_timeout_seconds):
+            return True
+
+        return False
 
     @property
     def use_cooldown(self) -> pendulum.DateTime:
@@ -347,6 +389,8 @@ class Player(Creature):
                      or MoveXYZ(x, y, z, accuracy, accuracy, running) \
                      or newMoveXY(x, y, optimized, accuracy, running) \
                      or newMoveXY(x, y, optimized, accuracy, running)
+        if result:
+            self._coords_cache = (x, y, z)
         return result
 
     @alive_action

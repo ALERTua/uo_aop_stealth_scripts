@@ -23,6 +23,7 @@ MAX_WEAPON_SEARCH_DISTANCE = 20
 CORPSE_FIND_DISTANCE = 20
 MAX_LJ_ITERATIONS = 4  # starting from 0
 MAX_FAIL_SAFE = 30  # starting from 0
+STUCK_TIMEOUT_SECONDS = 120
 LJ_DISTANCE_TO_TREE = 1
 LJ_CONTAINER_ID = 0x728F3B3B
 LOOT_CONTAINER_OPEN_SUBCONTAINERS = True
@@ -442,8 +443,8 @@ class Lumberjack(ScriptBase):
                      f"{self.lj_i}/{MAX_LJ_ITERATIONS + 1}{fail_safe_str}{line_contents}")
             stealth.Wait(constants.USE_COOLDOWN / 6)
 
-    def start(self):
-        super(type(self), self).start()
+    def start(self, **kwargs):
+        super(type(self), self).start(stuck_timeout_seconds=STUCK_TIMEOUT_SECONDS)
         self.check_health()
         self.general_weight_check()
         dist_to_container = self.player.path_distance_to(*self.loot_container.xy)

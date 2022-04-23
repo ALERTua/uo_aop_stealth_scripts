@@ -55,6 +55,7 @@ class ScriptBase:
         self.tool_typeid = None
         self.trash_item_ids = constants.ITEM_IDS_TRASH
         self._hold_bandages = 2
+        self.stuck_timeout_seconds = None
         atexit.register(self.at_exit)
 
     def _register_signals(self):
@@ -67,9 +68,24 @@ class ScriptBase:
         log.debug(f"{self} atexit.")
         self.print_script_stats()
 
-    def start(self):
+    def stuck_check(self, **kwargs):
+        if self.stuck_timeout_seconds is None:
+            return
+
+        if self.player.is_stuck(self.stuck_timeout_seconds):
+            msg = f"{self.player} stuck for {self.stuck_timeout_seconds} seconds. Stopping {self.name}."
+            stealth.SetEventProc('evTimer1', None)
+            self.quit(message=msg, alarm=True)
+            stealth.SetARStatus(False)
+            stealth.Disconnect()
+            stealth.CorrectDisconnection()
+
+    def start(self, stuck_timeout_seconds=None):
         log.info(f"Starting {self.scenario_name}")
         self._start_time = pendulum.now()
+        if stuck_timeout_seconds is not None:
+            self.stuck_timeout_seconds = stuck_timeout_seconds
+            stealth.SetEventProc('evTimer1', self.stuck_check)
 
     def print_script_stats(self):
         if self.script_stats_str:
@@ -81,7 +97,10 @@ class ScriptBase:
                 log.info(f"  {line}")
 
     def __str__(self):
-        return self.name
+        return f"{self.name}({self.player})"
+
+    def __repr__(self):
+        return self.__str__()
 
     def stop(self):
         log.info(f"Stopping {self}")
@@ -367,8 +386,8 @@ class ScriptBase:
             if bank.is_empty:
                 log.info(f"Opening bank")
                 self.player.say('bank')
-                tools.result_delay()
                 self.player.hide()
+                tools.delay(1000)
             if self.player.xy == BANK_COORDS:
                 log.info(f"Grabbing reagents {reagent_types}")
                 for reg_type in reagent_types:
