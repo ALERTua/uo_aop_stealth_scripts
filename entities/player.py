@@ -158,6 +158,10 @@ class Player(Creature):
         return z
 
     def is_stuck(self, stuck_timeout_seconds):
+        if not stealth.Connected():
+            self._last_move = pendulum.now()
+            return False
+
         if self._last_move < pendulum.now() - pendulum.Duration(seconds=stuck_timeout_seconds):
             return True
 

@@ -69,7 +69,7 @@ class ScriptBase:
         self.print_script_stats()
 
     def stuck_check(self, **kwargs):
-        if not stealth.Connected() or self.stuck_timeout_seconds is None:
+        if self.stuck_timeout_seconds is None:
             return
 
         if self.player.is_stuck(self.stuck_timeout_seconds):
