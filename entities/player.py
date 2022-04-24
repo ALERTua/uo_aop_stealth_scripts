@@ -157,8 +157,15 @@ class Player(Creature):
         self._coords_cache = (x, y, z)
         return z
 
+    @property
+    def connected(self):
+        try:
+            return stealth.Connected()
+        except:
+            return False
+
     def is_stuck(self, stuck_timeout_seconds):
-        if not stealth.Connected():
+        if not self.connected:
             self._last_move = pendulum.now()
             return False
 
