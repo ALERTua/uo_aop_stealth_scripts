@@ -221,7 +221,12 @@ class Player(Creature):
 
     @property
     def max_stamina(self):
-        return MaxStam()
+        fallback = 50
+        try:
+            return MaxStam()
+        except Exception as e:
+            log.debug(f"Fail to get max stamina: {e}. Returning {fallback}")
+            return fallback
 
     @property
     def hidden(self):
