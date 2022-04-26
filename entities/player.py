@@ -167,6 +167,7 @@ class Player(Creature):
     def is_stuck(self, stuck_timeout_seconds):
         if not self.connected:
             self._last_move = pendulum.now()
+            tools.delay(3000)
             return False
 
         if self._last_move < pendulum.now() - pendulum.Duration(seconds=stuck_timeout_seconds):
