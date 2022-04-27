@@ -120,7 +120,6 @@ class Player(Creature):
         self._use_cooldown = None
         self._mount = None
         self.__coords_cache = (0, 0, 0)
-        self._last_move = pendulum.now()
         SetFindDistance(99)
 
     @property
@@ -133,8 +132,24 @@ class Player(Creature):
             return
 
         self.__coords_cache = value
-        self._last_move = pendulum.now()
-        # log.debug(f"Player moved to {value} @ {self._last_move}")
+        self.last_move = pendulum.now()
+
+    @property
+    def last_move(self):
+        last_move = stealth.GetGlobal('char', 'last_move')
+        if last_move:
+            output = pendulum.from_timestamp(float(last_move))
+        else:
+            self.last_move = output = pendulum.now()
+        # log.info(f'Last move: {type(output)} {output}')
+        return output
+
+    @last_move.setter
+    def last_move(self, value):
+        if not isinstance(value, (str, float)):
+            value = value.timestamp()
+        # log.info(f"Setting last_move to {type(value)} {value}")
+        stealth.SetGlobal('char', 'last_move', value)
 
     @property
     def x(self):
@@ -166,11 +181,11 @@ class Player(Creature):
 
     def is_stuck(self, stuck_timeout_seconds):
         if not self.connected:
-            self._last_move = pendulum.now()
+            self.last_move = pendulum.now()
             tools.delay(3000)
             return False
 
-        if self._last_move < pendulum.now() - pendulum.Duration(seconds=stuck_timeout_seconds):
+        if self.last_move < pendulum.now() - pendulum.Duration(seconds=stuck_timeout_seconds):
             return True
 
         return False
@@ -235,7 +250,7 @@ class Player(Creature):
 
     @skill_cd
     def hide(self):
-        log.info('Hiding')
+        log.info('🥷Hiding')
         UseSkill('hiding')
 
     def hide_until_hidden(self):
@@ -267,9 +282,6 @@ class Player(Creature):
     @property
     def last_container(self):
         return Container.instantiate(LastContainer())
-
-    def get_type_id(self, object_id):
-        return GetType(object_id)
 
     @property
     def backpack(self):
@@ -343,13 +355,13 @@ class Player(Creature):
                 tools.delay(constants.USE_COOLDOWN)
 
             if i >= max_tries:
-                log.info(f"Couldn't open {container} after {max_tries} tries")
+                log.info(f"⛔Couldn't open {container} after {max_tries} tries")
                 return False
 
             log.debug(f"Successfuly opened {container}")
 
         if subcontainers:
-            log.info(f"Opening subcontainers for {container}")
+            log.info(f"🎒Opening subcontainers for {container}")
             _ = stealth.FindType(-1, container.id_)
             all_items = [Item.instantiate(i) for i in stealth.GetFoundList() if i]
             subcontainers_ = [i for i in all_items if i and i.is_container]
@@ -383,7 +395,7 @@ class Player(Creature):
 
     def move(self, x, y, z=0, optimized=True, accuracy=1, running=True, overweight_check=True):
         if overweight_check and self.overweight:
-            log.info(f"{self} Cannot move: overweight")
+            log.info(f"⛔⚖️{self} Cannot move: overweight")
             return
 
         if x <= 0 or y <= 0:
@@ -418,7 +430,7 @@ class Player(Creature):
         # ItemID, Count, MoveIntoID, X, Y, Z
         item = Item.instantiate(item_id)
         if not item.exists:
-            log.info(f"Cannot move nonexistent {item}")
+            log.info(f"⛔Cannot move nonexistent {item}")
             return
 
         container = Container.instantiate(target_id, force_class=True) if target_id else self.backpack
@@ -469,11 +481,11 @@ class Player(Creature):
             return
 
         i = 0
-        log.info(f"Grabbing {quantity}×{item}.")
+        log.info(f"🤚Grabbing {quantity}×{item}.")
         while not (grab_result := Grab(item.id_, quantity)) and item.parent == item_container \
                 and (i := i + 1) < max_tries:
             log.info(f".")
-        log.debug(f"done. Grabbing success: {grab_result}")
+        log.debug(f"Done. Grabbing success: {grab_result}")
         return grab_result
 
     @alive_action
@@ -482,20 +494,20 @@ class Player(Creature):
         item = Item.instantiate(item_id)
         item_container = copy(item.parent)
         if quantity == 0:
-            log.info(f"Cannot drop quantity {quantity} of {item}")
+            log.info(f"⛔Cannot drop quantity {quantity} of {item}")
             return
 
         if not item.exists:
-            log.info(f"Cannot drop {quantity} of nonexisting {item}")
+            log.info(f"⛔Cannot drop {quantity} of nonexisting {item}")
             return
 
         i = 0
-        log.info(f"Dropping {quantity}×{item}")
+        log.info(f"🤚Dropping {quantity}×{item}")
         while not (drop_result := Drop(item.id_, quantity, x, y, z)) and item.parent == item_container \
                 and (i := i + 1) < max_tries:
             log.info(f".")
         tools.result_delay()
-        log.debug(f"done. Dropping success: {drop_result}")
+        log.debug(f"Done. Dropping success: {drop_result}")
         return drop_result
 
     @use_cd
@@ -505,7 +517,7 @@ class Player(Creature):
     def _use_object(self, obj, announce=True):
         obj = Object.instantiate(obj)
         if obj.id_ in (0, None, -1):
-            log.info(f"Cannot use {obj}")
+            log.info(f"⛔Cannot use {obj}")
             return
 
         # if not obj.exists:
@@ -513,14 +525,14 @@ class Player(Creature):
         #     return
 
         if announce:
-            log.info(f"Using {obj}")
+            log.info(f"🤚Using {obj}")
         UseObject(obj.id_)
 
     @alive_action
     def use_object_on_object(self, obj, target):
         obj = Object.instantiate(obj)
         target = Object.instantiate(target)
-        log.info(f"Using {obj} on {target}")
+        log.info(f"🤚Using {obj} on {target}")
         CancelWaitTarget()
         self.use_object(obj, announce=False)
         WaitTargetObject(target.id_)
@@ -528,7 +540,7 @@ class Player(Creature):
     @alive_action
     def use_object_on_tile(self, obj, tile_type, x, y, z):
         obj = Object.instantiate(obj)
-        log.info(f"Using {obj} on tile {tile_type}:({x}, {y}, {z})")
+        log.info(f"🤚Using {obj} on tile {tile_type}:({x}, {y}, {z})")
         CancelWaitTarget()
         output = self.use_object(obj, announce=False)
         WaitTargetTile(tile_type, x, y, z)
@@ -584,7 +596,7 @@ class Player(Creature):
     @mining_cd
     def mine(self, direction):
         command = f"'pc mine {direction}"
-        log.info(f"Mining {direction}")
+        log.info(f"⛏️Mining {direction}")
         self.say(command)
 
     @alive_action
@@ -862,13 +874,13 @@ class Player(Creature):
 
         cutting_tool = cutting_tool or self.corpse_cutting_tool
         if not cutting_tool:
-            log.info(f"Cannot cut corpse {corpse_or_id}. No cutting tool.")
+            log.info(f"⛔Cannot cut corpse {corpse_or_id}. No cutting tool.")
             return
 
         if cutting_tool.parent == self.backpack:
             self.move_item(cutting_tool, target_id=self.backpack, allow_same_container=True)
 
-        log.info(f"Cutting {corpse_or_id}")
+        log.info(f"🔪Cutting {corpse_or_id}")
         self.use_object_on_object(cutting_tool, corpse)
 
     def path_to_coords(self, x, y, optimized=True, accuracy=1):  # accuracy must be 1 for creatures

@@ -1,11 +1,11 @@
-from entities.base_script import ScriptBase, log, stealth, tools, constants
+from entities.base_scenario import ScenarioBase, log, stealth, tools, constants
 
 LASTOBJECT_LASTTARGET = False
 LASTOBJECT = 0x728EF888
 LASTTARGET = 0x728B10FA
 
 
-class Inscription(ScriptBase):
+class Inscription(ScenarioBase):
     def __init__(self):
         super().__init__()
 

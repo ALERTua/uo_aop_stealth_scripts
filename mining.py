@@ -6,7 +6,7 @@ from entities.container import Container
 from entities.item import Item
 from entities.mob import Mob
 from tools import constants, tools
-from entities.base_script import ScriptBase, condition, stealth, alive_action
+from entities.base_scenario import ScenarioBase, condition, stealth, alive_action
 from tools.tools import log
 
 MINE_IRON = False
@@ -112,7 +112,7 @@ SUCCESS_MESSAGES = [
 ]
 
 
-class Miner(ScriptBase):
+class Miner(ScenarioBase):
     def __init__(self):
         super().__init__()
         self._mining_spots = []
@@ -140,7 +140,7 @@ class Miner(ScriptBase):
         self.parse_commands()
         dist_to_container = stealth.Dist(self.player.x, self.player.y, *MINING_CONTAINER_COORDS)
         if dist_to_container > 1:
-            log.info("Moving to unload")
+            log.info("➡️Moving to unload")
             if self.in_mine:
                 self.go_to_mine_entrance()
             self.wait_stamina()
@@ -151,7 +151,7 @@ class Miner(ScriptBase):
         #         and not self.player.open_container(self.loot_container, subcontainers=True):
         #     tools.telegram_message(f"Failed to open {self.loot_container}")
         self.player.open_container(self.loot_container, subcontainers=True)
-        log.info("Moving to unload done")
+        log.info("⬇️Moving to unload done")
 
     @alive_action
     def eat(self, **kwargs):
@@ -189,11 +189,11 @@ class Miner(ScriptBase):
             self.move_to_unload()
             pickaxe = self.player.find_type(constants.TYPE_ID_TOOL_PICKAXE, MINING_CONTAINER_ID)
             if not pickaxe:
-                log.info("WARNING! NO SPARE PICKAXES FOUND!")
+                log.info("⛔WARNING! NO SPARE PICKAXES FOUND!")
                 if not GET_FREE_PICKAXE:
                     self.quit()
 
-            log.info("Grabbing a Pickaxe")
+            log.info("🤚Grabbing a Pickaxe")
             return self.player.grab(pickaxe)
 
     @alive_action
@@ -202,7 +202,7 @@ class Miner(ScriptBase):
 
     @alive_action
     def unload(self):
-        log.info("Unloading")
+        log.info("🔃Unloading")
         self.move_to_unload()
         self.record_stats()
         self.player.unload_types(self.unload_itemids, MINING_CONTAINER_ID)
@@ -215,10 +215,10 @@ class Miner(ScriptBase):
         self.parse_commands()
         self.wait_stamina()
         self.check_overweight()
-        log.info(f"Going to the mine")
+        log.info(f"➡️Going to the mine")
         self.check_overweight()
         self.player.move(*MINE_ENTRANCE_COORDS)
-        log.info(f"Going to the mine done")
+        log.info(f"⬇️Going to the mine done")
         self.wait_stamina(0.1)
 
     @property

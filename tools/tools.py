@@ -34,6 +34,8 @@ def debug(ip=None):
     log.info("Connecting to PyCharm Debugger @ %s:%s" % (ip, port))
     try:
         pydevd_pycharm.settrace(ip, port=port, stdoutToServer=True, stderrToServer=True, suspend=False)
+    except ConnectionRefusedError:
+        return False
     except Exception as e:
         print("Error connecting to PyCharm Debugger @ %s:%s : %s %s" % (ip, port, type(e), e))
         log.verbose = False
@@ -42,11 +44,6 @@ def debug(ip=None):
     log.info("Connected to PyCharm Debugger @ %s:%s" % (ip, port))
     log.verbose = True
     return True
-
-
-DEBUG = True
-if DEBUG:
-    debug() or debug('192.168.1.2')
 
 
 def get_function_name():

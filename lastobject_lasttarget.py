@@ -1,9 +1,9 @@
-from entities.base_script import ScriptBase, stealth
+from entities.base_scenario import ScenarioBase, stealth
 from tools import tools
 from tools.tools import log
 
 
-class LastObjectLastTarget(ScriptBase):
+class LastObjectLastTarget(ScenarioBase):
     def __init__(self):
         super().__init__()
 

@@ -7,7 +7,7 @@ from entities.container import Container
 from entities.item import Item
 from entities.weapon import FishingPole
 from tools import tools, constants
-from entities.base_script import ScriptBase, log, stealth
+from entities.base_scenario import ScenarioBase, log, stealth
 from py_stealth import *
 
 ROAM_COORDS = [
@@ -110,7 +110,7 @@ if USE_RANGED_WEAPON:
 FISHING_LOOT = [i for i in FISHING_LOOT if i not in FISHING_TRASH]
 
 
-class Fishing(ScriptBase):
+class Fishing(ScenarioBase):
     def __init__(self):
         super().__init__()
         self.roam_spots = ROAM_COORDS or [self.player.coords]

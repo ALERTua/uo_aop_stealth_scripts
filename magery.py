@@ -1,15 +1,15 @@
-from entities.base_script import ScriptBase, log, stealth, tools, constants
+from entities.base_scenario import ScenarioBase, log, stealth, tools, constants
 
 LASTOBJECT_LASTTARGET = False
 LASTOBJECT = 0x72FD39D6
 LASTTARGET = 0x73150FC1
 
 
-class Magery(ScriptBase):
+class Magery(ScenarioBase):
     def __init__(self):
         super().__init__()
 
-    def start(self):
+    def start(self, **kwargs):
         super(type(self), self).start()
         HEALTH_THRESHOLD = self.player.max_hp * 0.5
         while True:

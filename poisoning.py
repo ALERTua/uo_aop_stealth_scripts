@@ -1,10 +1,10 @@
-from entities.base_script import ScriptBase, log, stealth, tools, constants
+from entities.base_scenario import ScenarioBase, log, stealth, tools, constants
 import pendulum
 
 from entities.item import Item
 
 
-class Poisoning(ScriptBase):
+class Poisoning(ScenarioBase):
     def __init__(self):
         super().__init__()
 

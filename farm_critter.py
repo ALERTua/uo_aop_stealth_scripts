@@ -6,7 +6,7 @@ from entities.item import Item
 from entities.mob import Mob
 from tools import tools, constants
 from tools.tools import log
-from entities.base_script import ScriptBase, stealth
+from entities.base_scenario import ScenarioBase, stealth
 
 
 ROAM_COORDS = [
@@ -32,7 +32,7 @@ LOOT_ITEMS.extend([constants.TYPE_ID_MACE, constants.TYPE_ID_BATTLE_AXE])  # mac
 HOLD_BANDAGES = 5
 
 
-class FarmCritter(ScriptBase):
+class FarmCritter(ScenarioBase):
     def __init__(self):
         super().__init__()
         self.roam_spots = ROAM_COORDS or [self.player.coords]
@@ -63,11 +63,11 @@ class FarmCritter(ScriptBase):
         self.parse_commands()
         dist_to_container = stealth.Dist(self.player.x, self.player.y, *LOOT_CONTAINER_COORDS)
         if dist_to_container > 1:
-            log.info("Moving to unload")
+            log.info("➡️Moving to unload")
             self.wait_stamina()
             self.player.move(*LOOT_CONTAINER_COORDS, accuracy=0)
             tools.ping_delay()
-            log.info("Moving to unload done")
+            log.info("⬇️Moving to unload done")
         self.player.use_object(LOOT_CONTAINER_ID)
 
     def check_bandages(self):
@@ -77,7 +77,7 @@ class FarmCritter(ScriptBase):
         return super().eat(container_id=LOOT_CONTAINER_ID)
 
     def unload(self):
-        log.info("Unloading")
+        log.info("🔃Unloading")
         self.move_to_unload()
         self.move_to_unload()
         unload_types = [
@@ -147,7 +147,7 @@ class FarmCritter(ScriptBase):
             container_weapon_ids.extend(found_weapons)
 
         if not container_weapon_ids:
-            log.info("WARNING! NO SPARE WEAPONS FOUND!")
+            log.info("⛔WARNING! NO SPARE WEAPONS FOUND!")
             tools.telegram_message(f"{self.player}: No weapons found")
             self.quit()
             return

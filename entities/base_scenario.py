@@ -17,6 +17,7 @@ from .container import Container
 from .item import Item
 from .mob import Mob
 from .player import Player, alive_action, bandage_cd
+from .script import Script
 
 BANK_COORDS = (2512, 556)
 HEALER_COORDS = constants.COORDS_MINOC_HEALER
@@ -37,7 +38,7 @@ def condition(condition_):
     return real_decorator
 
 
-class ScriptBase:
+class ScenarioBase:
     def __init__(self):
         self.scenario_name = self.__class__.__name__
         self.player = Player()
@@ -55,7 +56,6 @@ class ScriptBase:
         self.tool_typeid = None
         self.trash_item_ids = constants.ITEM_IDS_TRASH
         self._hold_bandages = 2
-        self.stuck_timeout_seconds = None
         atexit.register(self.at_exit)
 
     def _register_signals(self):
@@ -66,30 +66,22 @@ class ScriptBase:
 
     def at_exit(self):
         log.debug(f"{self} atexit.")
-        self.print_script_stats()
+        self.print_scenario_stats()
 
-    def stuck_check(self, **kwargs):
-        if self.stuck_timeout_seconds is None:
-            return
+    def start(self, stuck_timeout_seconds=None, debug=True):
+        if debug:
+            tools.debug() or tools.debug('192.168.1.2')
 
-        if self.player.is_stuck(self.stuck_timeout_seconds):
-            msg = f"{self.player} stuck for {self.stuck_timeout_seconds} seconds. Stopping {self.name}."
-            stealth.SetEventProc('evTimer1', None)
-            self.quit(message=msg, alarm=True)
-            stealth.SetARStatus(False)
-            stealth.Disconnect()
-            stealth.CorrectDisconnection()
-
-    def start(self, stuck_timeout_seconds=None):
         log.info(f"Starting {self.scenario_name}")
         self._start_time = pendulum.now()
-        if stuck_timeout_seconds is not None:
-            self.stuck_timeout_seconds = stuck_timeout_seconds
-            stealth.SetEventProc('evTimer1', self.stuck_check)
+        if stuck_timeout_seconds:
+            stealth.SetGlobal('char', 'stuck_timeout', stuck_timeout_seconds)
+            stuck_check_script = Script.instantiate('stuck_check')
+            stuck_check_script.start()
 
-    def print_script_stats(self):
+    def print_scenario_stats(self):
         if self.script_stats_str:
-            log.info(f"{self} stats:")
+            log.info(f"{self} stats starting from {self._start_time} ({self.script_running_time_words}):")
             for line in self.script_stats_str.split('\n'):
                 if not line:
                     continue
@@ -103,7 +95,7 @@ class ScriptBase:
         return self.__str__()
 
     def stop(self):
-        log.info(f"Stopping {self}")
+        log.info(f"⛔Stopping {self}")
         self.at_exit()
         stealth.StopAllScripts()
 
@@ -125,7 +117,7 @@ class ScriptBase:
         self._commands_cooldown[command] = pendulum.now().add(seconds=cooldown_secs)
 
     def report_stats(self):
-        self.print_script_stats()
+        self.print_scenario_stats()
 
     def parse_commands(self):
         journal = tools.journal(start_index=self.commands_journal_index)
@@ -162,13 +154,13 @@ class ScriptBase:
     def wait_stamina(self, threshold=0.2):
         stamina_threshold = self.player.max_stamina * threshold
         if self.player.stamina < stamina_threshold:
-            log.info(f"Waiting stamina at least {stamina_threshold}")
+            log.info(f"⌛Waiting stamina at least {stamina_threshold}")
         else:
             return
 
         while self.player.alive and self.player.stamina < stamina_threshold:
             tools.result_delay()
-        log.info(f"Stamina reached {stamina_threshold}")
+        log.info(f"💪Stamina reached {stamina_threshold}")
 
     @alive_action
     def pick_up_items(self, type_ids=None):
@@ -259,7 +251,7 @@ class ScriptBase:
         #     log.info(f"Won't engage mob that {distance} this far away")
         #     return
 
-        log.info(f"Engaging {mob.hp}/{mob.max_hp} {mob} at distance {mob.distance}")
+        log.info(f"⚔️Engaging {mob.hp}/{mob.max_hp} {mob} at distance {mob.distance}")
         if mob.mutated:
             stealth.Alarm()
 
@@ -348,7 +340,7 @@ class ScriptBase:
     def quit(self, message=None, alarm=True):
         if alarm:
             stealth.Alarm()
-        log.info("Quitting")
+        log.info("⛔Quitting")
         message = message or f"{self.player} quitting"
         tools.telegram_message(message)
         self.at_exit()
@@ -371,7 +363,7 @@ class ScriptBase:
         return self.script_running_time.in_words()
 
     def resurrect(self):
-        log.info(f"Resurrecting and returning")
+        log.info(f"‍⚕️Resurrecting and returning")
         self._processed_mobs = []
         while self.player.dead:
             self.player.war_mode = False
