@@ -220,8 +220,8 @@ class ScenarioBase:
             check_health_func()  # script_check_health in scripts
             tools.result_delay()
             self.player.attack(mob.id_)
-            log.info(f"({i}/{max_i}) [{self.player.hp}/{self.player.max_hp}] "
-                     f"Fight with [{mob.hp}/{mob.max_hp}]{mob} at range {mob.distance}")
+            log.info(f"ℹ️{i}/{max_i} 🧑♥️{self.player.hp}/{self.player.max_hp} "
+                     f"⚔️Fight with 💀♥️{mob.hp}/{mob.max_hp} {mob} at range {mob.distance}")
         if remount:
             self.mount()
             tools.result_delay()
@@ -251,7 +251,7 @@ class ScenarioBase:
         #     log.info(f"Won't engage mob that {distance} this far away")
         #     return
 
-        log.info(f"⚔️Engaging {mob.hp}/{mob.max_hp} {mob} at distance {mob.distance}")
+        log.info(f"⚔️Engaging 💀♥️{mob.hp}/{mob.max_hp} {mob} at distance {mob.distance}")
         if mob.mutated:
             stealth.Alarm()
 
@@ -327,7 +327,7 @@ class ScenarioBase:
 
                 drop_quantity = min((weight_drop_needed // drop_item.weight_one) + 1, drop_item.quantity)
                 if not drop_quantity:
-                    log.info(f"won't drop {drop_quantity} of {drop_item.name} {drop_object_id}")
+                    log.info(f"Won't drop {drop_quantity} of {drop_item.name} {drop_object_id}")
                     break
 
                 log.info(f"Need to relieve of {weight_drop_needed}st. Dropping {drop_quantity}×{drop_item}")
@@ -367,35 +367,35 @@ class ScenarioBase:
         self._processed_mobs = []
         while self.player.dead:
             self.player.war_mode = False
-            log.info(f"Moving to healer {HEALER_COORDS}")
+            log.info(f"➡️Moving to healer {HEALER_COORDS}")
             self.player.move(*HEALER_COORDS, accuracy=0)
         reagent_types = [constants.TYPE_ID_REAGENT_MR, constants.TYPE_ID_REAGENT_BM, constants.TYPE_ID_REAGENT_BP]
         while len(regs := self.player.find_types_backpack(reagent_types)) < 3 or self.player.xy == BANK_COORDS:
             if self.player.xy != BANK_COORDS:
-                log.info(f"Moving to bank @ {BANK_COORDS}")
+                log.info(f"➡️Moving to bank @ {BANK_COORDS}")
                 self.player.move(*BANK_COORDS, accuracy=0)
             bank = self.player.bank_container
             if bank.is_empty:
-                log.info(f"Opening bank")
+                log.info(f"🏦Opening bank")
                 self.player.say('bank')
                 self.player.hide()
                 tools.delay(1000)
             if self.player.xy == BANK_COORDS:
-                log.info(f"Grabbing reagents {reagent_types}")
+                log.info(f"🤚Grabbing reagents {reagent_types}")
                 for reg_type in reagent_types:
                     if self.player.got_item_type(reg_type):
                         continue
 
                     bank_item = self.player.find_type(reg_type, bank)
                     if not bank_item:
-                        log.info(f"No reagent {reg_type} found @ bank")
+                        log.info(f"⛔No reagent {reg_type} found @ bank")
                         tools.telegram_message(f"Couldn't resurrect. No reagent {reg_type} found @ bank")
                         self.disconnect()
                         quit()
 
                     grab_result = self.player.grab(bank_item, quantity=1)
                     if not grab_result:
-                        log.info(f"Couldn't grab {reg_type}:{bank_item} from bank")
+                        log.info(f"⛔Couldn't grab {reg_type}:{bank_item} from bank")
                         tools.telegram_message(f"Couldn't resurrect. Couldn't grab {reg_type}:{bank_item} from bank")
                         self.disconnect()
                         quit()
@@ -408,13 +408,13 @@ class ScenarioBase:
                     self.player.use_object_on_object(bank_bandage, self.player)
                 rune = self.player.find_type(constants.TYPE_ID_RUNE, bank)
                 if rune:
-                    log.info(f"Casting Recall @ {rune}")
+                    log.info(f"🪄Casting Recall @ {rune}")
                     stealth.CastToObject('recall', rune)
                     stealth.Wait(5000)
                     if self.player.xy != BANK_COORDS:
                         break
                 else:
-                    log.info(f"No rune found @ bank")
+                    log.info(f"⛔No rune found @ bank")
                     tools.telegram_message("Couldn't resurrect. No rune found @ bank")
                     self.disconnect()
                     quit()
@@ -426,12 +426,12 @@ class ScenarioBase:
         loot_container = loot_container or self.loot_container
         self.parse_commands()
         if self.player.distance_to(*loot_container.xy) > 1 or self.player.path_distance_to(*loot_container.xy) > 1:
-            log.info("Moving to unload")
+            log.info("➡️Moving to unload")
             self.wait_stamina()
             self.player.disarm()
             self.rearm_from_container(container_id=self.player.backpack)
             result = self.player.move_to_object(loot_container, accuracy=0, running=self.should_run)
-            log.debug(f"Moving to unload result: {result}")
+            log.debug(f"⬇️Moving to unload result: {result}")
         tools.ping_delay()
         self.player.open_container(loot_container, subcontainers=True)
 
@@ -455,10 +455,10 @@ class ScenarioBase:
         while self.player.distance_to(spot_x, spot_y) > accuracy:
             i += 1
             if i > 10:
-                log.warning(f"Failed to reach {spot_x}, {spot_y} with accuracy {accuracy} in {i} tries")
+                log.warning(f"⛔Failed to reach {spot_x}, {spot_y} with accuracy {accuracy} in {i} tries")
                 break
 
-            log.info(f"Moving to spot: {spot_x} {spot_y}")
+            log.info(f"➡️Moving to spot: {spot_x} {spot_y}")
             self.wait_stamina(0.1)
             if not self.player.move(spot_x, spot_y, accuracy=accuracy, running=self.should_run):
                 self.player.move(spot_x, spot_y, accuracy=accuracy + 1, running=self.should_run)
@@ -496,7 +496,7 @@ class ScenarioBase:
 
         if not container_items:
             todo = stealth.GetFindedList()
-            log.info(f"WARNING! NO SPARE {typeid} FOUND! {tools.get_prev_function_name()}")
+            log.info(f"⛔WARNING! NO SPARE {typeid} FOUND! {tools.get_prev_function_name()}")
             tools.telegram_message(f"{self.player}: {self.name}: No {typeid} found: {todo}")
             self.quit()
             return
@@ -511,7 +511,7 @@ class ScenarioBase:
 
         while not self.player.got_item_quantity(typeid, quantity) \
                 and not self.player.move_item(container_item, quantity=loot_quantity):
-            log.info(f"Grabbing {loot_quantity}×{container_item}")
+            log.info(f"🤚Grabbing {loot_quantity}×{container_item}")
             tools.ping_delay()
         log.debug(f"{tools.get_function_name()} done")
 
@@ -525,7 +525,7 @@ class ScenarioBase:
     def unload(self, item_ids=None, container=None, drink_trash_potions=True):
         item_ids = item_ids or self.unload_itemids
         container = container or self.loot_container
-        log.info("Unloading")
+        log.info("🔃Unloading")
         self.move_to_unload()
         self.record_stats()
         self.parse_commands()
@@ -596,14 +596,14 @@ class ScenarioBase:
         if not player_bandages or stealth.GetQuantity(player_bandages) < quantity:
             bandages = self.player.find_type(constants.TYPE_ID_BANDAGE, container)
             if not bandages:
-                log.info("WARNING! NO SPARE BANDAGES FOUND!")
+                log.info("⛔WARNING! NO SPARE BANDAGES FOUND!")
                 tools.telegram_message(f"{self.player}: No bandages found. "
                                        f"Script ran for {self.script_running_time_words}")
                 self.quit()
                 return
 
             while not self.got_bandages(quantity) and not self.player.move_item(bandages, quantity):
-                log.info("Grabbing Bandages")
+                log.info("🤚Grabbing Bandages")
                 tools.ping_delay()
 
     @alive_action
@@ -611,10 +611,10 @@ class ScenarioBase:
         container_id = container_id or self.loot_container
         food_type = food_type or constants.TYPE_ID_FOOD_FISHSTEAKS
         self.player.open_container(container_id)
-        log.info("Eating")
+        log.info("🍽️Eating")
         food = self.player.find_type(food_type, container_id)
         if not food:
-            log.info("WARNING! NO FOOD FOUND!")
+            log.info("⛔WARNING! NO FOOD FOUND!")
             tools.telegram_message(f"{self.player}: No food found", disable_notification=True)
             return
 
@@ -706,7 +706,7 @@ class ScenarioBase:
         if not container.exists or not container.is_container:
             return
 
-        log.info(f"Rearming from {container}")
+        log.info(f"🪓Rearming from {container}")
         arms = []
         weapon_type_ids = weapon_type_ids or constants.TYPE_IDS_MELEE_WEAPONS
         if weapon_type_ids:
@@ -799,7 +799,7 @@ class ScenarioBase:
         while trash_potions := self.player.find_types_character(trash_potions_type_id):
             for potion in trash_potions:
                 potion_object = Item.instantiate(potion)
-                log.info(f"Drinking trash potion {potion_object}")
+                log.info(f"🍷Drinking trash potion {potion_object}")
                 # noinspection PyProtectedMember
                 self.player._use_object(potion_object)
                 tools.delay(constants.POTION_COOLDOWN)
