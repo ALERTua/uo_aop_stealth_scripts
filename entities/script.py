@@ -50,11 +50,40 @@ class Script:
 
     def start(self):
         if not self.running:
+            log.info(f"Starting {self}")
             stealth.StartScript(str(self.path))
 
     def stop(self):
         if self.running:
+            log.info(f"Stopping {self}")
             stealth.StopScript(str(self.path))
+
+    def stop_all_except_this(self):
+        log.info(f"Stopping all scripts except {self}")
+        for script in get_running_scripts():
+            if script != self:
+                script.stop()
+
+    def pause(self):
+        if not self.paused:
+            log.info(f"Pausing {self}")
+            stealth.PauseResumeScript(self.index)
+
+    def resume(self):
+        if self.paused:
+            log.info(f"Resuming {self}")
+            stealth.PauseResumeScript(self.index)
+
+    def restart(self):
+        log.info(f"Restarting {self}")
+        self.stop()
+        self.start()
+
+    def restart_all_except_this(self):
+        log.info(f"Restarting all scripts except {self}")
+        for script in get_running_scripts():
+            if script != self:
+                script.restart()
 
 
 def get_running_scripts() -> List[Script]:

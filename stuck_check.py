@@ -39,22 +39,29 @@ class StuckCheck(ScenarioBase):
         last_move = self.player.last_move
         # log.info(f"{self} stuck_check: last_move: {last_move}")
         stuck_timer = pendulum.now() - last_move
-        if stuck_timer.in_seconds() > self.stuck_timeout_seconds * 0.75:
-            log.info(f"❗{self} stuck_timer: {stuck_timer.in_seconds()}/{self.stuck_timeout_seconds}")
+        stuck_timer_seconds = stuck_timer.in_seconds()
+        if stuck_timer_seconds > self.stuck_timeout_seconds * 0.75:
+            log.info(f"❗{self} stuck_timer: {stuck_timer_seconds}/{self.stuck_timeout_seconds}")
 
         if not self.player.connected or not self.player.is_stuck(self.stuck_timeout_seconds):
             return
 
-        if stealth.GetGlobal('char', 'reconnected'):
-            msg = f"⛔{self.player} stuck for {self.stuck_timeout_seconds} seconds. Stopping {self.name}."
+        reconnects = int(stealth.GetGlobal('char', 'reconnected') or 0)
+        reconnects_threshold = int(stealth.GetGlobal('char', 'reconnects_threshold') or 10)
+        if reconnects > reconnects_threshold:
+            msg = f"⛔{self.player} stuck for {stuck_timer_seconds}/{self.stuck_timeout_seconds} seconds. " \
+                  f"Stopping {self.name}."
             log.error(msg)
+            self.script.stop_all_except_this()
             self.quit(message=msg, alarm=True)
             stealth.SetARStatus(False)
             stealth.CorrectDisconnection()
-            stealth.StopAllScripts()
         else:
             log.info("⛔Stuck. Reconnecting...")
-            stealth.SetGlobal('char', 'reconnected', 'true')
+            new_reconnects = reconnects + 1
+            tools.telegram_message(f'{self.player} reconnecting {self.name} {new_reconnects}/{reconnects_threshold}: '
+                                   f'{stuck_timer_seconds}/{self.stuck_timeout_seconds}')
+            stealth.SetGlobal('char', 'reconnected', new_reconnects)
             # stealth.SetARStatus(True)
             stealth.Disconnect()
             tools.delay(5000)

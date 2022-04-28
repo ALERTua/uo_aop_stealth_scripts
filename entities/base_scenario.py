@@ -3,6 +3,7 @@ import random
 import signal
 from copy import copy
 from functools import wraps
+from pathlib import Path
 from typing import Iterable
 
 import pendulum
@@ -42,6 +43,7 @@ class ScenarioBase:
     def __init__(self):
         self.scenario_name = self.__class__.__name__
         self.player = Player()
+        self.script = Script.instantiate(Path(__file__).absolute())
         self._start_time = None
         self._processed_mobs = []
         self.script_stats = {}
