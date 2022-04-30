@@ -48,7 +48,7 @@ class StuckCheck(ScenarioBase):
 
         reconnects = int(stealth.GetGlobal('char', 'reconnected') or 0)
         reconnects_threshold = int(stealth.GetGlobal('char', 'reconnects_threshold') or 10)
-        if reconnects > reconnects_threshold:
+        if reconnects >= reconnects_threshold:
             msg = f"⛔{self.player} stuck for {stuck_timer_seconds}/{self.stuck_timeout_seconds} seconds. " \
                   f"Stopping {self.name}."
             log.error(msg)
