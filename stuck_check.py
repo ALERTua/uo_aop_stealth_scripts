@@ -46,8 +46,8 @@ class StuckCheck(ScenarioBase):
         if not self.player.connected or not self.player.is_stuck(self.stuck_timeout_seconds):
             return
 
-        reconnects = int(stealth.GetGlobal('char', 'reconnected') or 0)
-        reconnects_threshold = int(stealth.GetGlobal('char', 'reconnects_threshold') or 10)
+        reconnects = int(stealth.GetGlobal('char', 'reconnects') or 0)
+        reconnects_threshold = int(stealth.GetGlobal('char', 'reconnects_threshold') or 5)
         if reconnects >= reconnects_threshold:
             msg = f"⛔{self.player} stuck for {stuck_timer_seconds}/{self.stuck_timeout_seconds} seconds. " \
                   f"Stopping {self.name}."
@@ -61,7 +61,7 @@ class StuckCheck(ScenarioBase):
             new_reconnects = reconnects + 1
             tools.telegram_message(f'{self.player} reconnecting {self.name} {new_reconnects}/{reconnects_threshold}: '
                                    f'{stuck_timer_seconds}/{self.stuck_timeout_seconds}')
-            stealth.SetGlobal('char', 'reconnected', new_reconnects)
+            stealth.SetGlobal('char', 'reconnects', new_reconnects)
             # stealth.SetARStatus(True)
             stealth.Disconnect()
             tools.delay(5000)

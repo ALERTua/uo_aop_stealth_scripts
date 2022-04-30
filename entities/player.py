@@ -133,6 +133,7 @@ class Player(Creature):
 
         self.__coords_cache = value
         self.last_move = pendulum.now()
+        stealth.SetGlobal('char', 'reconnects', 0)
 
     @property
     def last_move(self):
