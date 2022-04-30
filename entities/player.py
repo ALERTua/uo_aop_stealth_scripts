@@ -429,7 +429,7 @@ class Player(Creature):
             item_id = random.choice(item_id)
         # ItemID, Count, MoveIntoID, X, Y, Z
         item = Item.instantiate(item_id)
-        if not item.exists:
+        if not item.exists or not item.quantity:
             log.info(f"⛔Cannot move nonexistent {item}")
             return
 
