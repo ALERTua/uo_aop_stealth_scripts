@@ -77,7 +77,7 @@ class ScenarioBase:
         log.info(f"Starting {self.scenario_name}")
         self._start_time = pendulum.now()
         if stuck_timeout_seconds:
-            stealth.SetGlobal('char', 'stuck_timeout', stuck_timeout_seconds)
+            stealth.SetGlobal('char', constants.VAR_STUCK_TIMEOUT, stuck_timeout_seconds)
             stuck_check_script = Script.instantiate('stuck_check')
             stuck_check_script.start()
 

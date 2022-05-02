@@ -11,23 +11,28 @@ class StuckCheck(ScenarioBase):
 
     def start(self, stuck_timeout=None, **kwargs):
         # super(type(self), self).start(**kwargs)  # this is not needed
-        if (stuck_timeout := stuck_timeout or stealth.GetGlobal('char', 'stuck_timeout')) is not None:
+        if (stuck_timeout := stuck_timeout or stealth.GetGlobal('char', constants.VAR_STUCK_TIMEOUT)) is not None:
             self.stuck_timeout_seconds = int(stuck_timeout)
             log.info(f"Starting {self} with timeout {self.stuck_timeout_seconds} seconds")
             self.stuck_check_loop()
 
     def stuck_check_loop(self):
+        stealth.SetPauseScriptOnDisconnectStatus(False)
         while True:
             running_scripts = get_running_scripts()
             if len(running_scripts) == 1:
-                log.info(f"{self} stuck_check_loop: {running_scripts}. breaking")
+                log.info(f"{self} is alone. Stopping")
+                self.script.stop()
                 break
 
-            paused_scripts = [i for i in running_scripts if i.paused]
-            if len(paused_scripts) > 0:
-                log.info(f"{self} is paused. Waiting for {paused_scripts} to unpause...")
+            if stealth.Connected():
+                # log.info(f"{self} is connected. Unpausing all scripts")
+                # self.script.unpause_all_except_this()
+                paused_scripts = [i for i in running_scripts if i.paused]
+                if paused_scripts:
+                    log.info(f"Waiting for paused scripts: {paused_scripts}")
             else:
-                self.stuck_check()
+                self.script.pause_all_except_this()
             tools.delay(1000)
 
         log.info(f"{self} stopped.")
@@ -46,11 +51,11 @@ class StuckCheck(ScenarioBase):
         if not self.player.connected or not self.player.is_stuck(self.stuck_timeout_seconds):
             return
 
-        reconnects = int(stealth.GetGlobal('char', 'reconnects') or 0)
-        reconnects_threshold = int(stealth.GetGlobal('char', 'reconnects_threshold') or 5)
-        if reconnects >= reconnects_threshold:
-            msg = f"⛔{self.player} stuck for {stuck_timer_seconds}/{self.stuck_timeout_seconds} seconds. " \
-                  f"Stopping {self.name}."
+        reconnects = int(stealth.GetGlobal('char', constants.VAR_RECONNECTS) or 0)
+        reconnects_limit = int(stealth.GetGlobal('char', constants.VAR_RECONNECTS_LIMIT) or 2)
+        if reconnects > reconnects_limit:
+            msg = f"⛔{self.player} stuck {reconnects} times for {stuck_timer_seconds}/{self.stuck_timeout_seconds} " \
+                  f"seconds. Stopping {self.name}."
             log.error(msg)
             self.script.stop_all_except_this()
             self.quit(message=msg, alarm=True)
@@ -59,9 +64,9 @@ class StuckCheck(ScenarioBase):
         else:
             log.info("⛔Stuck. Reconnecting...")
             new_reconnects = reconnects + 1
-            tools.telegram_message(f'{self.player} reconnecting {self.name} {new_reconnects}/{reconnects_threshold}: '
-                                   f'{stuck_timer_seconds}/{self.stuck_timeout_seconds}')
-            stealth.SetGlobal('char', 'reconnects', new_reconnects)
+            tools.telegram_message(f'{self.player} reconnecting {self.name} {new_reconnects}/{reconnects_limit}: '
+                                   f'{stuck_timer_seconds}/{self.stuck_timeout_seconds}', disable_notification=True)
+            stealth.SetGlobal('char', constants.VAR_RECONNECTS, new_reconnects)
             # stealth.SetARStatus(True)
             stealth.Disconnect()
             tools.delay(5000)

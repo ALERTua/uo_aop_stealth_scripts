@@ -45,8 +45,12 @@ class Script:
         return self in get_running_scripts()
 
     @property
+    def state(self):
+        return int(stealth.GetScriptState(self.index))
+
+    @property
     def paused(self):
-        return not bool(int(stealth.GetScriptState(self.index)))
+        return self.state == 2
 
     def start(self):
         if not self.running:
@@ -61,8 +65,21 @@ class Script:
     def stop_all_except_this(self):
         log.info(f"Stopping all scripts except {self}")
         for script in get_running_scripts():
-            if script != self:
+            if script.path != self.path:
                 script.stop()
+
+    def pause_all_except_this(self):
+        # log.info(f"Pausing all scripts except {self}")
+        for script in get_running_scripts():
+            if script.path != self.path:
+                script.pause()
+
+    def unpause_all_except_this(self):
+        # log.info(f"Unpausing all scripts except {self}")
+        for script in get_running_scripts():
+            # log.info(f"{script} {script.index} {script.paused} {stealth.GetScriptState(script.index)}")
+            if script.path != self.path:
+                script.resume()
 
     def pause(self):
         if not self.paused:
@@ -72,7 +89,6 @@ class Script:
     def resume(self):
         if self.paused:
             log.info(f"Resuming {self}")
-            stealth.PauseResumeScript(self.index)
 
     def restart(self):
         log.info(f"Restarting {self}")

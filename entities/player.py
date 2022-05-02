@@ -133,11 +133,11 @@ class Player(Creature):
 
         self.__coords_cache = value
         self.last_move = pendulum.now()
-        stealth.SetGlobal('char', 'reconnects', 0)
+        stealth.SetGlobal('char', constants.VAR_RECONNECTS, 0)
 
     @property
     def last_move(self):
-        last_move = stealth.GetGlobal('char', 'last_move')
+        last_move = stealth.GetGlobal('char', constants.VAR_LAST_MOVE)
         if last_move:
             output = pendulum.from_timestamp(float(last_move))
         else:
@@ -150,7 +150,7 @@ class Player(Creature):
         if not isinstance(value, (str, float)):
             value = value.timestamp()
         # log.info(f"Setting last_move to {type(value)} {value}")
-        stealth.SetGlobal('char', 'last_move', value)
+        stealth.SetGlobal('char', constants.VAR_LAST_MOVE, value)
 
     @property
     def x(self):

@@ -33,6 +33,12 @@ class Notoriety(Enum):
     Player = 65
 
 
+# VARIABLES
+VAR_LAST_MOVE = 'last_move'
+VAR_RECONNECTS = 'reconnects'
+VAR_RECONNECTS_LIMIT = 'reconnects_limit'
+VAR_STUCK_TIMEOUT = 'stuck_timeout'
+
 # RANGES
 AGGRO_RANGE = 15
 ENGAGE_MAX_DISTANCE = 25
