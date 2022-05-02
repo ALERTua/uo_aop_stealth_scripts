@@ -555,8 +555,10 @@ class ScenarioBase:
             # noinspection PyProtectedMember
             tools.delay(15000)  # in case of false-positive at relogin
             if self.player.dead:
-                tools.telegram_message(f'{self.player} is dead. Script ran for {self.script_running_time_words}. '
-                                       f'Resurrecting.')
+                msg = f'{self.player} is dead. Script ran for {self.script_running_time_words}. ' \
+                      f'Resurrecting.'
+                log.info(msg)
+                tools.telegram_message(msg)
                 creatures = self.player.find_creatures(distance=30, path_distance=False)
                 creatures = [i for i in creatures if i.name and i != self.player]
                 creatures_str = ", ".join([f"{'Human' if c.human else 'Non-Human'} {c}" for c in creatures])
