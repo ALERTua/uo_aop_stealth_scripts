@@ -338,9 +338,11 @@ class Player(Creature):
     @container_cd
     def open_container(self, container, max_tries=15, subcontainers=False, force=False):  # todo: with subcontainers
         container = Container.instantiate(container, force_class=True)
-        if not force and not subcontainers and self.last_container == container and not container.is_empty:
-            return
+        if not force and not subcontainers and (self.last_container == container and not container.is_empty):
+            log.debug(f"Skipping already open {container}")
+            return True
 
+        log.info(f"🎒Opening {container}")
         # if not container.exists:
         #     log.info(f"Cannot open non-existing {container}")
         #     return
@@ -365,7 +367,7 @@ class Player(Creature):
             log.info(f"🎒Opening subcontainers for {container}")
             _ = stealth.FindType(-1, container.id_)
             all_items = [Item.instantiate(i) for i in stealth.GetFoundList() if i]
-            subcontainers_ = [i for i in all_items if i and i.is_container]
+            subcontainers_ = [Container.instantiate(i, force_class=True) for i in all_items if i and i.is_container]
             for subcontainer in subcontainers_:
                 self._open_container(subcontainer)
 
