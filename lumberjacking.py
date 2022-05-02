@@ -37,15 +37,15 @@ LJ_TRASH = [
     constants.TYPE_ID_ARMOR_LEATHER_BUSTIER,
     constants.TYPE_ID_ARMOR_LEATHER_SKIRT,
 ]
+LJ_TOOLS = constants.TYPE_ID_TOOL_TREE_CUTTING
 LJ_LOOT = [
     constants.TYPE_ID_LOGS,
     constants.TYPE_ID_HIDE,
     *constants.TYPE_IDS_LOOT,
-    # constants.TYPE_ID_BANDAGE,
-    # constants.TYPE_ID_HATCHET,
+    *LJ_TOOLS,
+    constants.TYPE_ID_BANDAGE,
 ]
 LJ_LOOT = [i for i in LJ_LOOT if i not in LJ_TRASH]
-
 LJ_SPOTS = [
     (0x0CD0, 2512, 207, 0),
     (0x0CE3, 2516, 210, 0),
@@ -161,11 +161,14 @@ class Lumberjack(ScenarioBase):
 
     @property
     def hatchet(self):
-        return Hatchet.instantiate(self.player.find_type_backpack(constants.TYPE_ID_HATCHET))
+        # return Hatchet.instantiate(self.player.find_type_backpack(constants.TYPE_ID_HATCHET))
+        hatchets = self.player.find_types_backpack(LJ_TOOLS, recursive=True)
+        if hatchets:
+            return Hatchet.instantiate(hatchets[0])
 
     @property
     def got_hatchet(self):
-        return self.hatchet.exists
+        return self.hatchet and self.hatchet.exists
 
     @alive_action
     def pick_up_items(self, **kwargs):
@@ -222,8 +225,8 @@ class Lumberjack(ScenarioBase):
         for i in range(3):
             self.player.open_container(self.loot_container, subcontainers=True)
             tools.result_delay()
-            container_hatchet = self.player.find_types_container(constants.TYPE_ID_HATCHET,
-                                                                 container_ids=self.loot_container, recursive=True)
+            container_hatchet = self.player.find_types_container(LJ_TOOLS, container_ids=self.loot_container,
+                                                                 recursive=True)
             if container_hatchet:
                 success = True
                 break
@@ -236,7 +239,7 @@ class Lumberjack(ScenarioBase):
 
         # noinspection PyUnboundLocalVariable
         while not self.got_hatchet and not self.player.move_item(container_hatchet):
-            log.info("🤚Grabbing a Hatchet")
+            log.info(f"🤚Grabbing {container_hatchet}")
             tools.ping_delay()
 
         return True
