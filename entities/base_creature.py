@@ -1,8 +1,7 @@
+import tools.tools
 from .base_object import Object
-from tools import constants
+from tools import constants, tools
 from py_stealth import *
-
-from tools.tools import log
 
 
 class Creature(Object):
@@ -59,7 +58,11 @@ class Creature(Object):
 
     @property
     def dead(self):
-        return not IsObjectExists(self._id) or IsDead(self._id)
+        output = not IsObjectExists(self._id) or IsDead(self._id)
+        if output:
+            tools.delay(5000)  # recheck
+            output = not IsObjectExists(self._id) or IsDead(self._id)
+        return output
 
     @property
     def human(self):
