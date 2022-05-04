@@ -8,7 +8,7 @@ from entities.weapon import Hatchet
 from tools import constants, tools
 from tools.tools import log
 
-LJ_SLOGS = True  # simple logs
+LJ_SLOGS = False  # simple logs
 ENGAGE_MOBS = True
 ENGAGE_CRITTERS = True
 MOB_FIND_DISTANCE = 25
@@ -22,8 +22,8 @@ RESET_PROCESSED_MOBS_ON_UNLOAD = True
 MAX_WEAPON_SEARCH_DISTANCE = 20
 CORPSE_FIND_DISTANCE = 20
 MAX_LJ_ITERATIONS = 4  # starting from 0
-MAX_FAIL_SAFE = 30  # starting from 0
-STUCK_TIMEOUT_SECONDS = 150
+MAX_FAIL_SAFE = 10  # starting from 0
+STUCK_TIMEOUT_SECONDS = 120
 # STUCK_TIMEOUT_SECONDS = None
 LJ_DISTANCE_TO_TREE = 1
 LJ_CONTAINER_ID = 0x728F3B3B
@@ -144,6 +144,7 @@ class Lumberjack(ScenarioBase):
             (constants.TYPE_ID_LOGS, -1, constants.WEIGHT_LOGS),
         ]
         self.player._mount = MOUNT_ID
+        self._low_hatchets_notified = False
 
     @property
     def current_tree(self):
@@ -168,7 +169,7 @@ class Lumberjack(ScenarioBase):
 
     @property
     def got_hatchet(self):
-        return self.hatchet and self.hatchet.exists
+        return self.hatchet is not None and self.hatchet.exists
 
     @alive_action
     def pick_up_items(self, **kwargs):
@@ -223,11 +224,17 @@ class Lumberjack(ScenarioBase):
         self.move_to_unload()
         success = False
         for i in range(3):
-            self.player.open_container(self.loot_container, subcontainers=True)
-            tools.result_delay()
-            container_hatchet = self.player.find_types_container(LJ_TOOLS, container_ids=self.loot_container,
-                                                                 recursive=True)
-            if container_hatchet:
+            self.player.open_container(self.loot_container, subcontainers=True, force=True)
+            tools.delay(1000)
+            container_hatchets = self.player.find_types_container(LJ_TOOLS, container_ids=self.loot_container,
+                                                                  recursive=True)
+            if container_hatchets:
+                if len(container_hatchets) <= 3 and not self._low_hatchets_notified:
+                    log.info(f"⛔WARNING! LOW HATCHETS: {len(container_hatchets)}!")
+                    tools.telegram_message(f"{self.player}: Low hatchets: {len(container_hatchets)}")
+                    self._low_hatchets_notified = True
+                else:
+                    self._low_hatchets_notified = False
                 success = True
                 break
 
@@ -238,8 +245,8 @@ class Lumberjack(ScenarioBase):
             return
 
         # noinspection PyUnboundLocalVariable
-        while not self.got_hatchet and not self.player.move_item(container_hatchet):
-            log.info(f"🤚Grabbing {container_hatchet}")
+        while not self.got_hatchet and not self.player.move_item(container_hatchets):
+            log.info(f"🤚Grabbing {container_hatchets}")
             tools.ping_delay()
 
         return True
@@ -258,7 +265,7 @@ class Lumberjack(ScenarioBase):
         self.move_to_unload()
         self.record_stats()
         self.parse_commands()
-        self.player.unload_types(self.unload_itemids, self.loot_container)
+        self.player.unload_types(self.unload_itemids, self.loot_container, [self.hatchet])
         self.check_hatchet()
         self.check_bandages()
         self.rearm_from_container()

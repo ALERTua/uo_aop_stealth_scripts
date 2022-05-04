@@ -201,7 +201,7 @@ def coords_array_closest(starting_coords, coords_array):
 
 def reconnect():
     stealth.Disconnect()
-    delay(7000)
+    delay(5000)
 
 
 def is_latin(word):

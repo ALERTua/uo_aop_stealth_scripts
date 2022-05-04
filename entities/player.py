@@ -183,7 +183,7 @@ class Player(Creature):
     def is_stuck(self, stuck_timeout_seconds):
         if not self.connected:
             self.last_move = pendulum.now()
-            tools.delay(3000)
+            tools.delay(5000)
             return False
 
         if self.last_move < pendulum.now() - pendulum.Duration(seconds=stuck_timeout_seconds):
@@ -324,6 +324,9 @@ class Player(Creature):
 
     def _open_container(self, container):
         container = Container.instantiate(container)
+        if container.id_ == 0:  # Ground
+            return True
+
         if self.last_container == container and not container.is_empty:
             return True
 
@@ -421,9 +424,12 @@ class Player(Creature):
                      or MoveXYZ(x, y, z, accuracy, accuracy, running) \
                      or newMoveXY(x, y, optimized, accuracy, running) \
                      or newMoveXY(x, y, optimized, accuracy, running)
-        if result:
-            self._coords_cache = (x, y, z)
+
+        self.coords_cache_update()
         return result
+
+    def coords_cache_update(self):
+        _ = (self.x, self.y, self.z)
 
     @alive_action
     @drag_cd
@@ -571,7 +577,8 @@ class Player(Creature):
 
     @alive_action
     @set_find_distance(constants.USE_GROUND_RANGE)
-    def unload_types(self, item_types, container_id):
+    def unload_types(self, item_types, container_id, exceptions=None):
+        exceptions = exceptions or []
         container = Container.instantiate(container_id)
         for unload_type in item_types:
             if got_type := stealth.FindType(unload_type):
@@ -584,7 +591,11 @@ class Player(Creature):
 
                     got_type = Item.instantiate(got_type)
                     if not got_type.quantity:
-                        continue
+                        break
+
+                    # if got_type.id_ in [i.id_ for i in exceptions]:
+                    if got_type in exceptions:
+                        break
 
                     if not self.move_item(got_type, got_type.quantity, container, 0, 0, 0):
                         log.debug(f"Couldn't move {got_type} to {container}. Trying to open the container")

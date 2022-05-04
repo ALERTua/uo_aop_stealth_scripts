@@ -7,6 +7,7 @@ from entities.script import get_running_scripts
 class StuckCheck(ScenarioBase):
     def __init__(self):
         super().__init__()
+        self._journal_len = 0
         self.stuck_timeout_seconds = None
 
     def start(self, stuck_timeout=None, **kwargs):
@@ -17,7 +18,8 @@ class StuckCheck(ScenarioBase):
             self.stuck_check_loop()
 
     def stuck_check_loop(self):
-        stealth.SetPauseScriptOnDisconnectStatus(False)
+        # stealth.SetPauseScriptOnDisconnectStatus(False)
+        self._journal_len = stealth.HighJournal()
         while True:
             running_scripts = get_running_scripts()
             if len(running_scripts) == 1:
@@ -27,28 +29,40 @@ class StuckCheck(ScenarioBase):
 
             if stealth.Connected():
                 # log.info(f"{self} is connected. Unpausing all scripts")
-                # self.script.unpause_all_except_this()
+                # self.script.unpause_all_except_this()  # hangs Stealth
                 paused_scripts = [i for i in running_scripts if i.paused]
                 if paused_scripts:
                     log.info(f"Waiting for paused scripts: {paused_scripts}")
+                else:
+                    self.stuck_check()
             else:
-                self.script.pause_all_except_this()
+                pass
+                # self.script.pause_all_except_this()  # hangs Stealth
             tools.delay(1000)
 
         log.info(f"{self} stopped.")
 
-    def stuck_check(self, **kwargs):
+    def stuck_check(self):
         if self.stuck_timeout_seconds is None:
             return
 
+        stuck = False
         last_move = self.player.last_move
         # log.info(f"{self} stuck_check: last_move: {last_move}")
         stuck_timer = pendulum.now() - last_move
         stuck_timer_seconds = stuck_timer.in_seconds()
         if stuck_timer_seconds > self.stuck_timeout_seconds * 0.75:
             log.info(f"❗{self} stuck_timer: {stuck_timer_seconds}/{self.stuck_timeout_seconds}")
+        elif stuck_timer_seconds == 0:
+            self._journal_len = stealth.HighJournal()
+        elif stuck_timer_seconds > 0 and stuck_timer_seconds % int(self.stuck_timeout_seconds / 10) == 0:
+            log.info(f"{self} stuck_timer: {stuck_timer_seconds}/{self.stuck_timeout_seconds}")
+            if stuck_timer_seconds > 15:
+                if self._journal_len == stealth.HighJournal():
+                    log.info(f"{self}: Journal not updated. Considering stuck.")
+                    stuck = True
 
-        if not self.player.connected or not self.player.is_stuck(self.stuck_timeout_seconds):
+        if not stuck and (not self.player.connected or not self.player.is_stuck(self.stuck_timeout_seconds)):
             return
 
         reconnects = int(stealth.GetGlobal('char', constants.VAR_RECONNECTS) or 0)
@@ -67,9 +81,8 @@ class StuckCheck(ScenarioBase):
             tools.telegram_message(f'{self.player} reconnecting {self.name} {new_reconnects}/{reconnects_limit}: '
                                    f'{stuck_timer_seconds}/{self.stuck_timeout_seconds}', disable_notification=True)
             stealth.SetGlobal('char', constants.VAR_RECONNECTS, new_reconnects)
-            # stealth.SetARStatus(True)
-            stealth.Disconnect()
-            tools.delay(5000)
+            stealth.SetARStatus(True)
+            tools.reconnect()
             self.player.last_move = pendulum.now()
 
 
