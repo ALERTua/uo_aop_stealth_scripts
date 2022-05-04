@@ -58,6 +58,7 @@ class ScenarioBase:
         self.tool_typeid = None
         self.trash_item_ids = constants.ITEM_IDS_TRASH
         self._hold_bandages = 2
+        self._low_bandages_notified = False
         atexit.register(self.at_exit)
 
     def _register_signals(self):
@@ -593,7 +594,7 @@ class ScenarioBase:
         return self._unload_get_item(constants.TYPE_ID_BANDAGE, container, quantity=hold_bandages, recursive=False)
 
     @alive_action
-    def _check_bandages(self, quantity, container_id):
+    def _check_bandages(self, quantity, container_id, try_limit=10):
         log.info("Checking Bandages")
         container = Container.instantiate(container_id)
         player_bandages = self.player.got_bandages
@@ -604,11 +605,20 @@ class ScenarioBase:
                 tools.telegram_message(f"{self.player}: No bandages found. "
                                        f"Script ran for {self.script_running_time_words}")
                 self.quit()
-                return
+            elif (container_bandages_quantity := stealth.GetQuantity(bandages)) < self._hold_bandages * 5 \
+                    and not self._low_bandages_notified:
+                log.info(f"⛔WARNING! LOW BANDAGES: {container_bandages_quantity}!")
+                tools.telegram_message(f"{self.player}: Low bandages: {container_bandages_quantity}")
+                self._low_bandages_notified = True
+            else:
+                self._low_bandages_notified = False
 
-            while not self.got_bandages(quantity) and not self.player.move_item(bandages, quantity):
+            i = 0
+            while not self.got_bandages(quantity) \
+                    and not self.player.move_item(bandages, quantity) \
+                    and (i := i + 1) < try_limit:
                 log.info("🤚Grabbing Bandages")
-                tools.ping_delay()
+                tools.result_delay()
 
     @alive_action
     def eat(self, container_id=None, food_type=None):
