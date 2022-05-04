@@ -24,8 +24,7 @@ class Object:
 
     def __eq__(self, other):
         try:
-            output = (self.__class__ == other.__class__) and (self.id_ == other.id_)
-            return output
+            return self.id_ == other.id_
         except:
             return False
 
