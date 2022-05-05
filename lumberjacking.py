@@ -169,7 +169,8 @@ class Lumberjack(ScenarioBase):
 
     @property
     def got_hatchet(self):
-        return self.hatchet is not None and self.hatchet.exists
+        hatchet = self.hatchet
+        return hatchet and hatchet.exists
 
     @alive_action
     def pick_up_items(self, **kwargs):
