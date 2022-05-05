@@ -55,6 +55,10 @@ class Object:
         id_ = obj
         if isinstance(obj, Object):
             id_ = obj.id_
+
+        if id_ is None:
+            return None
+
         type_id = stealth.GetType(id_)
         if type_id and not force_class:
             if type_id in constants.TYPE_IDS_CONTAINER or stealth.IsContainer(id_):

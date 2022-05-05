@@ -35,7 +35,10 @@ class Script:
 
     @property
     def index(self):
-        output = get_running_scripts().index(self)
+        running_scripts = get_running_scripts()
+        this_script = [i for i in running_scripts if i.path == self.path]
+        assert this_script, f"{self} is not running"
+        output = running_scripts.index(this_script[0])
         assert Path(stealth.GetScriptPath(output)) == self.path, "got wrong index"
         return output
 
@@ -54,12 +57,12 @@ class Script:
     def start(self):
         if not self.running:
             log.info(f"Starting {self}")
-            stealth.StartScript(str(self.path))
+            stealth.StartScript(self.path.as_posix())
 
     def stop(self):
         if self.running:
             log.info(f"Stopping {self}")
-            stealth.StopScript(str(self.path))
+            stealth.StopScript(self.index)
 
     def stop_all_except_this(self):
         log.info(f"Stopping all scripts except {self}")
@@ -100,10 +103,16 @@ class Script:
             if script != self:
                 script.restart()
 
+    def rename(self, name):
+        stealth.SetScriptName(self.index, name)
+
 
 def get_running_scripts() -> List[Script]:
     output = []
-    for i in range(stealth.GetScriptCount()):
-        output.append(Script.instantiate(stealth.GetScriptPath(i)))
+    scripts_count = stealth.GetScriptCount()
+    for i in range(scripts_count):
+        script_path = stealth.GetScriptPath(i)
+        script = Script.instantiate(script_path)
+        output.append(script)
 
     return output

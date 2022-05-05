@@ -2,10 +2,10 @@ import atexit
 import random
 import signal
 from copy import copy
-from functools import wraps
+from functools import wraps, cached_property
 from pathlib import Path
 from typing import Iterable
-
+import sys
 import pendulum
 
 import py_stealth as stealth
@@ -41,9 +41,7 @@ def condition(condition_):
 
 class ScenarioBase:
     def __init__(self):
-        self.scenario_name = self.__class__.__name__
         self.player = Player()
-        self.script = Script.instantiate(Path(__file__).absolute())
         self._start_time = None
         self._processed_mobs = []
         self.script_stats = {}
@@ -59,6 +57,8 @@ class ScenarioBase:
         self.trash_item_ids = constants.ITEM_IDS_TRASH
         self._hold_bandages = 2
         self._low_bandages_notified = False
+        # noinspection PyProtectedMember
+        self.path = sys._getframe(1).f_globals['__file__']
         atexit.register(self.at_exit)
 
     def _register_signals(self):
@@ -71,11 +71,15 @@ class ScenarioBase:
         log.debug(f"{self} atexit.")
         self.print_scenario_stats()
 
+    @cached_property
+    def script(self):
+        return Script.instantiate(self.path)
+
     def start(self, stuck_timeout_seconds=None, debug=True):
         if debug:
             tools.debug() or tools.debug('192.168.1.2')
 
-        log.info(f"Starting {self.scenario_name}")
+        log.info(f"Starting {self.name}")
         self._start_time = pendulum.now()
         if stuck_timeout_seconds:
             stealth.SetGlobal('char', constants.VAR_STUCK_TIMEOUT, stuck_timeout_seconds)

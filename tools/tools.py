@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import List
 import ping3
 
+
 from entities.journal_line import JournalLine
 import py_stealth as stealth
 
@@ -21,7 +22,7 @@ _server_ip = None
 _server_ping_average = {}
 
 
-def debug(ip=None):
+def debug(ip=None, port=None):
     try:
         # pylint: disable=import-error
         import pydevd_pycharm  # noqa: E402
@@ -30,7 +31,7 @@ def debug(ip=None):
         return debug(ip=ip)
 
     ip = ip or 'localhost'
-    port = 12345
+    port = port or 12345
     log.info("Connecting to PyCharm Debugger @ %s:%s" % (ip, port))
     try:
         pydevd_pycharm.settrace(ip, port=port, stdoutToServer=True, stderrToServer=True, suspend=False)
@@ -43,6 +44,7 @@ def debug(ip=None):
 
     log.info("Connected to PyCharm Debugger @ %s:%s" % (ip, port))
     log.verbose = True
+
     return True
 
 

@@ -3,6 +3,8 @@ import pendulum
 from entities.base_scenario import ScenarioBase, log, stealth, tools, constants
 from entities.script import get_running_scripts
 
+DEBUG = False
+
 
 class StuckCheck(ScenarioBase):
     def __init__(self):
@@ -11,6 +13,9 @@ class StuckCheck(ScenarioBase):
         self.stuck_timeout_seconds = None
 
     def start(self, stuck_timeout=None, **kwargs):
+        if DEBUG:
+            tools.debug(port=12346)
+        self.script.rename(self.name)  # todo: rename to __init__ and move to base after fix
         # super(type(self), self).start(**kwargs)  # this is not needed
         if (stuck_timeout := stuck_timeout or stealth.GetGlobal('char', constants.VAR_STUCK_TIMEOUT)) is not None:
             self.stuck_timeout_seconds = int(stuck_timeout)
@@ -18,7 +23,7 @@ class StuckCheck(ScenarioBase):
             self.stuck_check_loop()
 
     def stuck_check_loop(self):
-        # stealth.SetPauseScriptOnDisconnectStatus(False)
+        stealth.SetPauseScriptOnDisconnectStatus(False)
         self._journal_len = stealth.HighJournal()
         while True:
             running_scripts = get_running_scripts()
@@ -30,16 +35,18 @@ class StuckCheck(ScenarioBase):
                 break
 
             if stealth.Connected():
-                # log.info(f"{self} is connected. Unpausing all scripts")
-                # self.script.unpause_all_except_this()  # hangs Stealth
                 paused_scripts = [i for i in running_scripts if i.paused]
                 if paused_scripts:
-                    log.info(f"Waiting for paused scripts: {paused_scripts}")
-                else:
-                    self.stuck_check()
+                    log.info(f"{self} is connected. Unpausing all scripts")
+                    tools.delay(2000)
+                    self.script.unpause_all_except_this()
+                # paused_scripts = [i for i in running_scripts if i.paused]
+                # if paused_scripts:
+                #     log.info(f"Waiting for paused scripts: {paused_scripts}")
+                # else:
+                self.stuck_check()
             else:
-                pass
-                # self.script.pause_all_except_this()  # hangs Stealth
+                self.script.pause_all_except_this()
             tools.delay(1000)
 
         log.info(f"{self} stopped.")
