@@ -23,7 +23,9 @@ class StuckCheck(ScenarioBase):
         while True:
             running_scripts = get_running_scripts()
             if len(running_scripts) == 1:
-                log.info(f"{self} is alone. Stopping")
+                msg = f"{self.player}: {self} is alone. Stopping"
+                log.info(msg)
+                tools.telegram_message(msg)
                 self.script.stop()
                 break
 
