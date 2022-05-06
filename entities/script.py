@@ -91,6 +91,7 @@ class Script:
     def resume(self):
         if self.paused:
             log.info(f"Resuming {self}")
+            stealth.PauseResumeScript(self.index)
 
     def restart(self):
         log.info(f"Restarting {self}")

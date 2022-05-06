@@ -24,6 +24,9 @@ class StuckCheck(ScenarioBase):
 
     def stuck_check_loop(self):
         stealth.SetPauseScriptOnDisconnectStatus(False)
+        stealth.SetARStatus(True)
+        stealth.SetGlobal('char', constants.VAR_RECONNECTS, 0)
+        self.player.last_move = pendulum.now()
         self._journal_len = stealth.HighJournal()
         while True:
             running_scripts = get_running_scripts()
