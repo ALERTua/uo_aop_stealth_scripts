@@ -57,7 +57,7 @@ class Script:
     def start(self):
         if not self.running:
             log.info(f"Starting {self}")
-            stealth.StartScript(self.path.as_posix())
+            stealth.StartScript(str(self.path))
 
     def stop(self):
         if self.running:

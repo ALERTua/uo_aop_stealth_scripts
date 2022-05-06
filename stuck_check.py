@@ -15,7 +15,7 @@ class StuckCheck(ScenarioBase):
     def start(self, stuck_timeout=None, **kwargs):
         if DEBUG:
             tools.debug(port=12346)
-        self.script.rename(self.name)  # todo: rename to __init__ and move to base after fix
+        # self.script.rename(self.name)  # todo: rename to __init__ and move to base after fix
         # super(type(self), self).start(**kwargs)  # this is not needed
         if (stuck_timeout := stuck_timeout or stealth.GetGlobal('char', constants.VAR_STUCK_TIMEOUT)) is not None:
             self.stuck_timeout_seconds = int(stuck_timeout)
