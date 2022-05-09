@@ -8,7 +8,8 @@ from entities.weapon import Hatchet
 from tools import constants, tools
 from tools.tools import log
 
-LJ_SLOGS = False  # simple logs
+LJ_SLOGS = True  # simple logs  # todo: drop simple logs option
+LJ_SLOGS_DROP = True
 ENGAGE_MOBS = True
 ENGAGE_CRITTERS = True
 MOB_FIND_DISTANCE = 25
@@ -367,6 +368,9 @@ class Lumberjack(ScenarioBase):
             self.lj_i = MAX_LJ_ITERATIONS  # force dig again after a mob is killed
         if loot_corpses:
             self.loot_corpses()
+            if LJ_SLOGS_DROP:
+                super().drop_trash(trash_items=[constants.TYPE_ID_LOGS], colors=[0])
+
         self.lj_check_hatchets()
         self.check_weapon()
         self.pick_up_items()
@@ -382,7 +386,7 @@ class Lumberjack(ScenarioBase):
                                     corpse_find_distance=CORPSE_FIND_DISTANCE)
 
     def drop_trash(self, **kwargs):
-        return super(Lumberjack, self).drop_trash(trash_items=self.trash_item_ids)
+        return super().drop_trash(trash_items=self.trash_item_ids)
 
     @condition(EQUIP_WEAPONS_FROM_GROUND)
     def check_weapon(self, **kwargs):

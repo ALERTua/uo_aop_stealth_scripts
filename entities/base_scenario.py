@@ -278,9 +278,9 @@ class ScenarioBase:
             self.drop_trash(trash_items=trash_items)
 
     @alive_action
-    def drop_trash(self, trash_items=None):
+    def drop_trash(self, trash_items=None, colors=None):
         trash_items = trash_items or self.trash_item_ids
-        return self.player.drop_trash_items(trash_items)
+        return self.player.drop_trash_items(trash_items, colors=colors)
 
     @alive_action
     def loot_corpses(self, drop_trash_items=True, trash_items=None, cut_corpses=True, corpse_find_distance=2):
@@ -299,14 +299,14 @@ class ScenarioBase:
         self.player.drop_trash_items(trash_item_ids=trash_items)
 
     @alive_action
-    def check_overweight(self, drop_types=None, trash_items=None):
+    def check_overweight(self, drop_types=None, trash_items=None, colors=None):
         if not self.player.overweight:  # consider near_max_weight
             return
 
         drop_types = drop_types or self.unload_itemids
         trash_items = trash_items or self.trash_item_ids
         self.player.break_action()
-        self.drop_trash(trash_items=trash_items)
+        self.drop_trash(trash_items=trash_items, colors=colors)
         self.drop_overweight_items(drop_types=drop_types)
 
     @alive_action

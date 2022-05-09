@@ -797,9 +797,9 @@ class Player(Creature):
         return self.move_item_types(item_types=item_types, **kwargs)
 
     @alive_action
-    def drop_trash_items(self, trash_item_ids=None):
+    def drop_trash_items(self, trash_item_ids=None, colors=None):
         trash_item_ids = trash_item_ids or constants.ITEM_IDS_TRASH
-        trash_items = self.find_types_backpack(trash_item_ids)
+        trash_items = self.find_types_backpack(trash_item_ids, colors=colors)
         for item in trash_items:
             if not self.drop_item(item, z=-10):
                 self.drop_item(item)
