@@ -4,6 +4,7 @@ from entities.base_scenario import ScenarioBase, log, stealth, tools, constants
 from entities.script import get_running_scripts
 
 DEBUG = False
+STUCK_IF_DEAD = False
 
 
 class StuckCheck(ScenarioBase):
@@ -56,6 +57,11 @@ class StuckCheck(ScenarioBase):
 
     def stuck_check(self):
         if self.stuck_timeout_seconds is None:
+            return
+
+        if not STUCK_IF_DEAD and self.player.dead:
+            log.debug(f"{self} is dead. Skipping stuck check")
+            tools.delay(10000)
             return
 
         stuck = False
