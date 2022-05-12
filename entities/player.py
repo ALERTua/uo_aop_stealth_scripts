@@ -525,6 +525,9 @@ class Player(Creature):
 
     def _use_object(self, obj, announce=True):
         obj = Object.instantiate(obj)
+        if not obj:
+            return
+
         if obj.id_ in (0, None, -1):
             log.info(f"⛔Cannot use {obj}")
             return
