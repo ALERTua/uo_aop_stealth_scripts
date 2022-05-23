@@ -37,6 +37,10 @@ class Creature(Object):
         return IsParalyzed(self._id)
 
     @property
+    def frozen(self):
+        return self.paralyzed
+
+    @property
     def poisoned(self):
         return IsPoisoned(self._id)
 

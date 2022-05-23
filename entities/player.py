@@ -410,9 +410,9 @@ class Player(Creature):
         if z is None:
             z = 0
 
-        # while self.paralyzed:  # todo: doesn't work @ AoP
-        #     log.info(f"Waiting until unParalyzed")
-        #     tools.result_delay()
+        while self.paralyzed:
+            log.info(f"Waiting until unParalyzed")
+            tools.result_delay()
 
         if self.z == z:
             result = newMoveXY(x, y, optimized, accuracy, running) \
@@ -1033,7 +1033,8 @@ class Player(Creature):
 
     @property
     def paralyzed(self):
-        return Paralyzed()
+        # return Paralyzed()  # doesn't work
+        return '[frozen]' in GetName(self.id_).lower()
 
     @property
     def poisoned(self):
