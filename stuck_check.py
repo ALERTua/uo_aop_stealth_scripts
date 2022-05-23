@@ -34,7 +34,7 @@ class StuckCheck(ScenarioBase):
             if len(running_scripts) == 1:
                 msg = f"{self.player}: {self} is alone. Stopping"
                 log.info(msg)
-                tools.telegram_message(msg)
+                tools.telegram_message(msg, disable_notification=True)
                 self.script.stop()
                 break
 
@@ -96,8 +96,14 @@ class StuckCheck(ScenarioBase):
         else:
             log.info("⛔Stuck. Reconnecting...")
             new_reconnects = reconnects + 1
-            tools.telegram_message(f'{self.player} reconnecting {self.name} {new_reconnects}/{reconnects_limit}: '
-                                   f'{stuck_timer_seconds}/{self.stuck_timeout_seconds}', disable_notification=True)
+            highjournal = stealth.HighJournal()
+            journal = tools.journal(highjournal - 5, highjournal)
+            journal = [i.text for i in journal]
+            journal_str = '\n'.join(journal)
+            msg = f'{self.player} reconnecting {self.name} {new_reconnects}/{reconnects_limit}: ' \
+                  f'{stuck_timer_seconds}/{self.stuck_timeout_seconds}\n' \
+                  f'{journal_str}'
+            tools.telegram_message(msg, disable_notification=True)
             stealth.SetGlobal('char', constants.VAR_RECONNECTS, new_reconnects)
             stealth.SetARStatus(True)
             tools.reconnect()
