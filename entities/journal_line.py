@@ -1,5 +1,6 @@
 # do not import tools here
 import re
+import pendulum
 from enum import unique, Enum
 
 import py_stealth as stealth
@@ -61,6 +62,15 @@ class JournalLine:
         output = " ".join(output)
         output = output.strip()
         return output
+
+    @property
+    def datetime(self):
+        datetime = pendulum.instance(self.time, tz=pendulum.local_timezone())
+        return datetime
+
+    @property
+    def datetime_readable(self):
+        return self.datetime.to_datetime_string()
 
 
 @unique
