@@ -97,8 +97,8 @@ class StuckCheck(ScenarioBase):
             log.info("⛔Stuck. Reconnecting...")
             new_reconnects = reconnects + 1
             highjournal = stealth.HighJournal()
-            journal = tools.journal(highjournal - 5, highjournal)
-            journal = [i.text for i in journal]
+            journal = tools.journal(highjournal - 10, highjournal)
+            journal = [f"{i.datetime_readable} {i.text_clean}" for i in journal]
             journal_str = '\n'.join(journal)
             msg = f'{self.player} reconnecting {self.name} {new_reconnects}/{reconnects_limit}: ' \
                   f'{stuck_timer_seconds}/{self.stuck_timeout_seconds}\n' \
